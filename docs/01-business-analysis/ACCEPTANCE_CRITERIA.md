@@ -1412,11 +1412,247 @@ Scenario: Screen reader labels
 
 ---
 
-## 24. Document Control
+## 24. New Acceptance Criteria (v1.0)
+
+> **Added per REVIEW_REPORT.md RC-09.** Covers VAT, inventory expiry, cookie reject, guest checkout, refund, low stock, and payment failure.
+
+### AC-TAX-001 — VAT Display
+
+**Story:** US-CUST-028
+
+```gherkin
+Scenario: VAT shown on cart
+  Given I have a cart with one product priced at 200,000 VND
+  When I view the cart
+  Then I see Subtotal: 200,000 VND
+  And I see VAT (10%): 20,000 VND
+  And I see Total: 220,000 VND
+
+Scenario: VAT shown on invoice
+  Given I complete an order
+  When I view my invoice PDF
+  Then VAT is shown as a separate line
+  And total = subtotal + VAT
+```
+
+### AC-TAX-002 — VAT Report
+
+**Story:** US-FIN-004
+
+```gherkin
+Scenario: Export VAT report
+  Given I am Finance Staff
+  When I generate the VAT report for June 2026
+  Then I see total taxable sales and total VAT collected
+  And I can download the report as CSV
+```
+
+### AC-INV-001 — Stock Reservation Expiry
+
+**Story:** US-GUEST-008
+
+```gherkin
+Scenario: Reservation expires after 15 minutes
+  Given I added a product to my cart
+  And I do not complete checkout
+  When 15 minutes elapse
+  Then the reservation is released
+  And the stock returns to the available pool
+  And another shopper can now purchase the item
+```
+
+### AC-INV-002 — Low Stock Alert
+
+**Story:** US-ADM-008
+
+```gherkin
+Scenario: Alert when stock falls below threshold
+  Given a product variant has threshold = 5
+  And current stock = 6
+  When an order reduces stock to 4
+  Then an email is sent to admin staff
+  And a dashboard banner shows the low-stock product
+```
+
+### AC-INV-003 — Manual Stock Adjustment
+
+**Story:** US-ADM-009
+
+```gherkin
+Scenario: Adjust stock with reason
+  Given I am Catalog Manager
+  When I adjust stock from 50 to 47 with reason "Hao hụt kiểm kê"
+  Then stock is set to 47
+  And an audit log entry is recorded with reason and actor
+```
+
+### AC-INV-004 — Restock After Return Inspection
+
+**Story:** US-ADM-010
+
+```gherkin
+Scenario: Restock sellable returned item
+  Given a returned item passed inspection
+  When I mark the item as "Có thể bán lại"
+  Then stock-on-hand is incremented by 1
+  And the item is available on the storefront
+
+Scenario: Dispose damaged returned item
+  Given a returned item failed inspection
+  When I mark the item as "Hỏng - thanh lý"
+  Then stock-on-hand is not incremented
+  And the disposed counter is incremented
+```
+
+### AC-PAY-001 — Payment Reconciliation
+
+**Story:** US-FIN-005
+
+```gherkin
+Scenario: Detect missed webhook
+  Given an order has been paid but no webhook was received
+  When the hourly reconciliation job runs
+  Then the order is updated to Confirmed
+  And a log entry records the reconciliation
+
+Scenario: Payment failure isolates order
+  Given I submit payment and the provider returns failure
+  When the webhook arrives
+  Then no order is created
+  And no stock is decremented
+  And I am redirected to retry payment
+```
+
+### AC-PAY-002 — Refund
+
+**Story:** US-CUST-027
+
+```gherkin
+Scenario: Full refund after return
+  Given I returned an item and the return was approved
+  When admin confirms receipt and inspection passes
+  Then a refund is initiated to my original payment method
+  And I receive an email confirming the refund amount
+
+Scenario: Refund to original method only
+  Given admin attempts to refund
+  When admin selects an alternative payment method
+  Then the system rejects the request
+  And the refund remains on the original method
+```
+
+### AC-MFA-001 — Admin MFA Setup
+
+**Story:** US-ADM-007
+
+```gherkin
+Scenario: First-time MFA setup
+  Given I am a new admin user
+  When I log in for the first time
+  Then I am prompted to set up TOTP MFA
+  And I cannot access admin pages until MFA is configured
+
+Scenario: Login with MFA
+  Given I have MFA configured
+  When I log in with email + password
+  Then I am prompted for the TOTP code
+  And on valid code, I am granted admin access
+```
+
+### AC-MED-001 — Image Upload
+
+**Story:** US-CAT-006
+
+```gherkin
+Scenario: Upload valid image
+  Given I upload a 1200x1200 JPEG, 2 MB
+  When the upload completes
+  Then the image is stored in Cloudinary
+  And thumbnail, card, and hero variants are auto-generated
+  And the image is associated with the product
+
+Scenario: Reject oversized image
+  Given I upload a 7 MB image
+  When I attempt to save
+  Then the system rejects the upload
+  And shows "Kích thước tối đa 5 MB"
+```
+
+### AC-ORD-001 — Order Status Timeline
+
+**Story:** US-ORD-007
+
+```gherkin
+Scenario: View status history
+  Given my order has transitioned through Pending, Confirmed, Shipped, Delivered
+  When I open the order detail page
+  Then I see a timeline of each transition with timestamp
+  And I see the actor (System / Admin / Carrier)
+```
+
+### AC-ORD-002 — Auto-Completion
+
+**Story:** US-ORD-008
+
+```gherkin
+Scenario: Auto-complete after 7 days
+  Given my order was marked Delivered on 2026-07-01
+  When 2026-07-08 arrives
+  Then my order is auto-transitioned to Completed
+  And I receive a confirmation email
+```
+
+### AC-GCH-001 — Guest Checkout
+
+**Story:** US-GUEST-014
+
+```gherkin
+Scenario: Complete checkout without account
+  Given I am a guest
+  And I have items in my cart
+  When I enter email, name, phone, address
+  And I select shipping and payment
+  And I complete payment
+  Then an order is created with guestEmail set
+  And customerId is null
+  And I receive an order confirmation email
+```
+
+### AC-GCH-002 — Optional Account Creation at Checkout
+
+**Story:** US-GUEST-015
+
+```gherkin
+Scenario: Create account at checkout
+  Given I check "Tạo tài khoản với mật khẩu" during checkout
+  When payment succeeds
+  Then a customer account is created
+  And my email is auto-verified
+  And the order is linked to my new account
+```
+
+### AC-GCH-003 — Magic Link Tracking
+
+**Story:** US-GUEST-016
+
+```gherkin
+Scenario: Track guest order via magic link
+  Given I am a guest who placed an order
+  When I click the tracking link in my email
+  Then I see my order status without login
+  And the link expires after 24 hours or single use
+```
+
+> **Note:** Cookie consent scenarios are covered by AC-AC-071g in §22.4.
+
+---
+
+## 25. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft with 70+ Gherkin scenarios |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added 17 new scenarios (VAT x2, Inventory x4, Payment x2, MFA, Media x2, Order x2, Guest Checkout x3, Cookie); addressed REVIEW_REPORT.md RC-09 |
 
 ---
 

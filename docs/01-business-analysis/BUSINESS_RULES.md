@@ -1058,11 +1058,368 @@ Modules: `CAT`, `CRT`, `CHK`, `ORD`, `SHP`, `ID`, `RVW`, `PRM`, `RTN`, `PAY`, `N
 
 ---
 
-## 18. Document Control
+## 19. Inventory Rules (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-01.** Inventory rules formalize stock lifecycle, reservations, and restock workflow.
+
+### BR-INV-001 — Stock Decrement Timing
+
+| Field | Value |
+| --- | --- |
+| **Description** | Stock-on-hand is decremented only when an order transitions from `Pending` to `Confirmed` (payment success). Reservation holds stock but does not decrement. |
+| **Condition** | Payment webhook success. |
+| **Exception** | Cancellation before payment leaves stock untouched. |
+| **Validation** | Database transaction wraps payment confirmation + stock decrement. |
+| **Related Features** | SF-INV-001, SF-INV-002, SF-PAY-003 |
+
+### BR-INV-002 — Reservation Window
+
+| Field | Value |
+| --- | --- |
+| **Description** | Stock reservation lasts 15 minutes. If checkout is not completed in this window, the reservation is released automatically by a scheduled job. |
+| **Condition** | Add-to-cart event. |
+| **Exception** | Guest cart cookies persist 7 days but reservation only 15 min. |
+| **Validation** | Scheduled job runs every minute; reservation table enforces expiry timestamp. |
+| **Related Features** | SF-INV-002, SF-CRT-001 |
+
+### BR-INV-003 — Concurrent Reservation Serialization
+
+| Field | Value |
+| --- | --- |
+| **Description** | Concurrent add-to-cart or order-creation for the last unit must be serialized; only one wins, others receive "Out of Stock". |
+| **Condition** | Last-unit contention. |
+| **Exception** | None. |
+| **Validation** | Database row-level lock or `SELECT ... FOR UPDATE` on stock row. |
+| **Related Features** | SF-INV-001 |
+
+### BR-INV-004 — Low Stock Threshold
+
+| Field | Value |
+| --- | --- |
+| **Description** | When stock falls below threshold (default 5, configurable per variant), an admin email and dashboard banner are triggered. |
+| **Condition** | Stock-on-hand < threshold. |
+| **Exception** | Threshold = 0 disables alert. |
+| **Validation** | Triggered on every stock mutation. |
+| **Related Features** | SF-INV-003, SF-NOT-001 |
+
+### BR-INV-005 — Manual Adjustment Audit
+
+| Field | Value |
+| --- | --- |
+| **Description** | Manual stock adjustments require a reason code (e.g., damage, audit correction, theft) and are written to the audit log with actor, timestamp, before/after values. |
+| **Condition** | Admin adjusts stock. |
+| **Exception** | None. |
+| **Validation** | Reason code is mandatory in API contract. |
+| **Related Features** | SF-INV-004, SF-ADM-010 |
+
+### BR-INV-006 — Inventory Return Restock (Added per RC-06)
+
+| Field | Value |
+| --- | --- |
+| **Description** | Returned items undergo inspection within 3 business days of receipt. Items in sellable condition are restocked; damaged items are flagged for disposal and removed from sellable stock. |
+| **Condition** | Return shipment received. |
+| **Exception** | Damaged-in-transit claims must be filed with carrier within 7 days. |
+| **Validation** | Restock only allowed when inspection outcome = `PASS`; disposal increments a `disposed` counter for audit. |
+| **Related Features** | SF-INV-005, SF-RTN-006 |
+
+### BR-INV-007 — Inventory Expiry / Reservation Cleanup
+
+| Field | Value |
+| --- | --- |
+| **Description** | Reservations older than 15 minutes are expired and stock returned to available pool. Inventory adjustments older than 90 days cannot be reversed. |
+| **Condition** | Time-based cleanup. |
+| **Exception** | None. |
+| **Validation** | Scheduled cron jobs verify expiry timestamps and immutable adjustment logs. |
+| **Related Features** | SF-INV-002, SF-INV-004 |
+
+---
+
+## 20. Payments Rules (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-02.** Payments rules formalize payment intent, webhook, and refund semantics.
+
+### BR-PAY-006 — Payment Intent Required
+
+| Field | Value |
+| --- | --- |
+| **Description** | Every order must have exactly one active payment intent. Re-attempting payment on a failed order creates a new intent and invalidates the prior one. |
+| **Condition** | Order in `Pending` state. |
+| **Exception** | None. |
+| **Validation** | Order entity enforces `currentPaymentIntentId`. |
+| **Related Features** | SF-PAY-001, SF-ORD-001 |
+
+### BR-PAY-007 — Idempotent Webhook
+
+| Field | Value |
+| --- | --- |
+| **Description** | Webhook events from the payment provider are idempotent: duplicate events (same provider transaction ID) shall not trigger duplicate order transitions. |
+| **Condition** | Webhook received. |
+| **Exception** | None. |
+| **Validation** | Processed webhook event IDs stored; duplicates skipped. |
+| **Related Features** | SF-PAY-003 |
+
+### BR-PAY-008 — Webhook Signature Verification
+
+| Field | Value |
+| --- | --- |
+| **Description** | All incoming payment webhooks must pass signature verification with the configured provider secret. Unverified webhooks are rejected and logged. |
+| **Condition** | Webhook endpoint. |
+| **Exception** | None. |
+| **Validation** | HMAC-SHA256 (or provider-equivalent) signature verified before processing. |
+| **Related Features** | SF-PAY-003, NFR-SEC-008 |
+
+### BR-PAY-009 — Refund to Original Method
+
+| Field | Value |
+| --- | --- |
+| **Description** | Refunds must be issued to the original payment method using the original provider transaction. Refunds to alternative methods are forbidden. |
+| **Condition** | Refund request. |
+| **Exception** | Bank transfer refund only if original method is unavailable (admin-approved). |
+| **Validation** | Provider API enforces; system logs exception. |
+| **Related Features** | SF-PAY-004, SF-RTN-006 |
+
+### BR-PAY-010 — Reconciliation Sweep
+
+| Field | Value |
+| --- | --- |
+| **Description** | Every hour, a reconciliation job polls pending orders against the payment provider to detect missed webhooks. Discrepancies are logged and alerted. |
+| **Condition** | Hourly cron. |
+| **Exception** | Provider rate limits respected. |
+| **Validation** | Job result is logged; unresolved orders after 24h trigger Sev-2 alert. |
+| **Related Features** | SF-PAY-005 |
+
+### BR-PAY-011 — Payment Failure Isolation
+
+| Field | Value |
+| --- | --- |
+| **Description** | A failed payment does not reserve stock, does not create an order, and does not charge the customer. The user is redirected to retry with the same or alternative method. |
+| **Condition** | Payment failure. |
+| **Exception** | None. |
+| **Validation** | Order created only on payment success; reservation released on failure. |
+| **Related Features** | SF-PAY-002, SF-CHK-008 |
+
+---
+
+## 21. Media Rules (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-03.** Media rules formalize upload, optimization, and retrieval.
+
+### BR-MED-001 — Image Type and Size Constraints
+
+| Field | Value |
+| --- | --- |
+| **Description** | Image uploads must be JPEG, PNG, or WebP, ≤ 5 MB, and minimum 800×800 pixels for product hero images. |
+| **Condition** | Upload. |
+| **Exception** | Marketing banners may use other dimensions. |
+| **Validation** | Server-side validation + Cloudinary eager transformation. |
+| **Related Features** | SF-MED-001 |
+
+### BR-MED-002 — Auto-Generated Variants
+
+| Field | Value |
+| --- | --- |
+| **Description** | Every uploaded image automatically generates thumbnail (200×200), card (400×400), and hero (1200×1200) variants via Cloudinary. |
+| **Condition** | Successful upload. |
+| **Exception** | None. |
+| **Validation** | Cloudinary eager transformation; system stores variant URLs. |
+| **Related Features** | SF-MED-002 |
+
+### BR-MED-003 — Image Ordering
+
+| Field | Value |
+| --- | --- |
+| **Description** | Product images have an `order` field. The first image (order=1) is the hero image used in catalog cards. |
+| **Condition** | Product detail page. |
+| **Exception** | None. |
+| **Validation** | Order is unique per product; enforced at API layer. |
+| **Related Features** | SF-MED-003, SF-CAT-006 |
+
+---
+
+## 22. Tax / VAT Rules (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-04.** VAT rules ensure compliance with Vietnamese tax law.
+
+### BR-TAX-001 — Standard VAT Rate
+
+| Field | Value |
+| --- | --- |
+| **Description** | Default VAT rate is 10% applied to all taxable product lines. Rate is configurable per environment via `VAT_RATE` setting. |
+| **Condition** | Taxable order. |
+| **Exception** | Tax-exempt categories override (BR-TAX-003). |
+| **Validation** | Calculation engine reads configured rate; stored with effective timestamp. |
+| **Related Features** | SF-TAX-001 |
+
+### BR-TAX-002 — VAT Display Required
+
+| Field | Value |
+| --- | --- |
+| **Description** | VAT must be displayed as a separate line item on cart, checkout, order confirmation, invoice, and VAT report. Hidden VAT is prohibited. |
+| **Condition** | Any price display. |
+| **Exception** | None. |
+| **Validation** | UI template enforces line item presence. |
+| **Related Features** | SF-TAX-002 |
+
+### BR-TAX-003 — Tax-Exempt Categories
+
+| Field | Value |
+| --- | --- |
+| **Description** | Admin may mark a category as tax-exempt (VAT = 0%) with reason recorded in audit log. Exempt categories must be reviewed annually. |
+| **Condition** | Admin marks category exempt. |
+| **Exception** | None. |
+| **Validation** | Audit log captures reason; UI shows "Không chịu VAT" badge. |
+| **Related Features** | SF-TAX-003 |
+
+### BR-TAX-004 — VAT Snapshot at Sale
+
+| Field | Value |
+| --- | --- |
+| **Description** | The VAT rate, base amount, and VAT amount are captured at the moment of order creation and immutable thereafter. |
+| **Condition** | Order creation. |
+| **Exception** | None. |
+| **Validation** | OrderLine stores `taxRate`, `taxAmount` as immutable fields. |
+| **Related Features** | SF-TAX-001, SF-TAX-004 |
+
+### BR-TAX-005 — VAT Rounding
+
+| Field | Value |
+| --- | --- |
+| **Description** | VAT is calculated per line and rounded to the nearest VND (banker's rounding). Final order VAT equals sum of line VATs; no order-level re-rounding. |
+| **Condition** | Order calculation. |
+| **Exception** | None. |
+| **Validation** | Money helpers enforce integer-only VND. |
+| **Related Features** | SF-TAX-001, BR-X-001 |
+
+---
+
+## 23. Guest Checkout Rules (Clarified per RC-05)
+
+### BR-GCH-001 — Guest Checkout Minimum Fields
+
+| Field | Value |
+| --- | --- |
+| **Description** | Guest checkout requires email, full name, phone, and shipping address. Account creation is optional. |
+| **Condition** | Checkout initiated as guest. |
+| **Exception** | None. |
+| **Validation** | API rejects submission missing required fields. |
+| **Related Features** | SF-CHK-002 |
+
+### BR-GCH-002 — Guest Order Storage
+
+| Field | Value |
+| --- | --- |
+| **Description** | Guest orders are stored with `customerId = NULL` and `guestEmail` populated. They are queryable by `guestEmail`. |
+| **Condition** | Guest order creation. |
+| **Exception** | None. |
+| **Validation** | Database constraint enforces `customerId XOR guestEmail`. |
+| **Related Features** | SF-ORD-001 |
+
+### BR-GCH-003 — Account Linking
+
+| Field | Value |
+| --- | --- |
+| **Description** | When a guest later registers with the same email (after verification), prior guest orders are attached to the new customer account. |
+| **Condition** | Customer registers; `email` matches `guestEmail`. |
+| **Exception** | None. |
+| **Validation** | Linking requires verified email; writes audit log. |
+| **Related Features** | SF-ID-001, SF-ID-003 |
+
+### BR-GCH-004 — Magic Link Tracking
+
+| Field | Value |
+| --- | --- |
+| **Description** | Guest order tracking URL contains a one-time magic link token (24h expiry, single-use). Subsequent requests require email re-verification. |
+| **Condition** | Guest views order. |
+| **Exception** | Token invalidation on use. |
+| **Validation** | Token table enforces `expiresAt` and `usedAt`. |
+| **Related Features** | SF-ORD-006 |
+
+---
+
+## 24. Order State Machine Rules (NEW per RC-07)
+
+### BR-OSM-001 — Allowed Transitions Only
+
+| Field | Value |
+| --- | --- |
+| **Description** | Order state transitions must follow the allowed transitions table in SRS §6.20. Any transition not in the table is rejected with HTTP 409 Conflict. |
+| **Condition** | State change attempted. |
+| **Exception** | Admin override requires elevated role and writes to audit log. |
+| **Validation** | State machine validator enforces. |
+| **Related Features** | SF-ORD-003, SF-ORD-004 |
+
+### BR-OSM-002 — Terminal State Immutability
+
+| Field | Value |
+| --- | --- |
+| **Description** | Orders in terminal states (`Cancelled`, `Completed`, `Returned`) cannot transition to any other state, except admin-driven refund linkage on `Returned`. |
+| **Condition** | Order in terminal state. |
+| **Exception** | Refund linkage on `Returned` is permitted. |
+| **Validation** | State machine enforces terminal flag. |
+| **Related Features** | SF-ORD-003 |
+
+### BR-OSM-003 — Status History Required
+
+| Field | Value |
+| --- | --- |
+| **Description** | Every state transition writes an entry to `order_status_history` with `fromState`, `toState`, `actorId`, `timestamp`, and optional `reason`. |
+| **Condition** | State transition. |
+| **Exception** | None. |
+| **Validation** | Service-layer write; database trigger as safety net. |
+| **Related Features** | SF-ORD-004 |
+
+### BR-OSM-004 — 7-Day Auto-Completion
+
+| Field | Value |
+| --- | --- |
+| **Description** | Orders in `Delivered` state automatically transition to `Completed` after 7 days unless customer has filed a return. |
+| **Condition** | Delivered + 7 days. |
+| **Exception** | Active return request suspends auto-completion. |
+| **Validation** | Daily cron checks `deliveredAt + 7 days`. |
+| **Related Features** | SF-ORD-003 |
+
+---
+
+## 25. Admin MFA Rules (NEW per RC-08)
+
+### BR-MFA-001 — Admin MFA Required
+
+| Field | Value |
+| --- | --- |
+| **Description** | All admin users must enable TOTP-based MFA on first login. Login is incomplete without MFA verification. |
+| **Condition** | Admin login. |
+| **Exception** | Break-glass account with separate MFA + alerting (one-time setup). |
+| **Validation** | Auth flow enforces MFA verification step. |
+| **Related Features** | SF-ID-011 |
+
+### BR-MFA-002 — Customer MFA Not Required
+
+| Field | Value |
+| --- | --- |
+| **Description** | Customer accounts do not require MFA in V1.0. Optional MFA for customers is deferred to V1.5. |
+| **Condition** | Customer login. |
+| **Exception** | None. |
+| **Validation** | Customer auth flow does not require MFA. |
+| **Related Features** | SF-ID-004 |
+
+### BR-MFA-003 — MFA Recovery
+
+| Field | Value |
+| --- | --- |
+| **Description** | Lost MFA device recovery requires admin staff identity verification and Tech Lead approval. Recovery codes are single-use. |
+| **Condition** | Admin reports lost device. |
+| **Exception** | Break-glass recovery with alerting. |
+| **Validation** | Recovery audit log entry required. |
+| **Related Features** | SF-ID-011 |
+
+---
+
+## 26. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft with 70+ rules across 14 modules |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added 7 Inventory rules, 6 Payments rules, 3 Media rules, 5 VAT/Tax rules, 4 Guest Checkout rules, 4 Order State Machine rules, 3 Admin MFA rules; addressed REVIEW_REPORT.md RC-01..08 |
 
 ---
 

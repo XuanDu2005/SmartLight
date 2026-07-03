@@ -203,6 +203,7 @@ This document lists every production-ready feature of the SmartLight platform. E
 | **Priority** | P0 |
 | **Dependencies** | — |
 | **Future Extension** | Extended warranty offerings. |
+| **MoSCoW** | Must Have (MVP) |
 
 ### SF-CAT-014 — SEO-Friendly URLs
 
@@ -1894,33 +1895,282 @@ This document lists every production-ready feature of the SmartLight platform. E
 
 ---
 
-## 19. Cross-Module Sub-Features
+## 18. Feature Catalog — Inventory Module (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-01.** This module was previously referenced as `SF-INV-001..002` and `SF-X-001..002` but was never defined.
+
+### SF-INV-001 — Stock Tracking
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Inventory |
+| **Description** | Maintain stock-on-hand per product variant, single warehouse. |
+| **Actors** | System, Catalog Manager |
+| **Business Value** | Prevents overselling; accurate availability. |
+| **Priority** | P0 |
+| **Dependencies** | — |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Multi-warehouse. |
+
+### SF-INV-002 — Stock Reservation
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Inventory |
+| **Description** | Reserve stock for 15 minutes during cart; convert to decrement on order creation. |
+| **Actors** | System |
+| **Business Value** | Prevents overselling under concurrency. |
+| **Priority** | P0 |
+| **Dependencies** | SF-INV-001, SF-CRT-001, SF-ORD-001 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Configurable reservation window. |
+
+### SF-INV-003 — Low Stock Alert
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Inventory |
+| **Description** | Notify admin when variant stock falls below configurable threshold. |
+| **Actors** | Catalog Manager, Admin |
+| **Business Value** | Avoid stockouts; reorder in time. |
+| **Priority** | P1 |
+| **Dependencies** | SF-INV-001 |
+| **MoSCoW** | Should Have (MVP) |
+| **Future Extension** | Auto-reorder integration with suppliers. |
+
+### SF-INV-004 — Inventory Adjustment
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Inventory |
+| **Description** | Allow admin to manually adjust stock with reason code (damage, audit correction). |
+| **Actors** | Catalog Manager |
+| **Business Value** | Operational accuracy. |
+| **Priority** | P1 |
+| **Dependencies** | SF-INV-001 |
+| **MoSCoW** | Should Have (MVP) |
+| **Future Extension** | Bulk adjustment, CSV upload. |
+
+### SF-INV-005 — Inventory Return Restock
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Inventory |
+| **Description** | After return inspection, restock sellable items, mark damaged for disposal. |
+| **Actors** | Order Fulfillment Staff, Catalog Manager |
+| **Business Value** | Recover inventory value; accurate stock. |
+| **Priority** | P1 |
+| **Dependencies** | SF-INV-001, SF-RTN-006 |
+| **MoSCoW** | Should Have (MVP) |
+| **Future Extension** | Disposal workflow integration. |
+
+---
+
+## 19. Feature Catalog — Payments Module (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-02.** Payments were previously described only as external interfaces. This module formalizes internal payment lifecycle.
+
+### SF-PAY-001 — Payment Intent
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Payments |
+| **Description** | Create a payment intent with the provider, returning redirect URL or hosted page. |
+| **Actors** | System, Customer |
+| **Business Value** | Initiate payment flow. |
+| **Priority** | P0 |
+| **Dependencies** | SF-CHK-006 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Saved payment methods. |
+
+### SF-PAY-002 — Payment Processing
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Payments |
+| **Description** | Process payment via Vietnamese provider (VNPay, MoMo, or ZaloPay). |
+| **Actors** | System, Payment Provider |
+| **Business Value** | Revenue collection. |
+| **Priority** | P0 |
+| **Dependencies** | SF-PAY-001 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Multi-provider orchestration. |
+
+### SF-PAY-003 — Payment Webhook Handler
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Payments |
+| **Description** | Receive and verify signed webhook from provider; reconcile order status. |
+| **Actors** | System, Payment Provider |
+| **Business Value** | Reliable status confirmation. |
+| **Priority** | P0 |
+| **Dependencies** | SF-PAY-002 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Multi-provider webhook normalization. |
+
+### SF-PAY-004 — Refund Processing
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Payments |
+| **Description** | Issue full or partial refund to original payment method. |
+| **Actors** | Admin, System |
+| **Business Value** | Customer satisfaction; legal compliance. |
+| **Priority** | P0 |
+| **Dependencies** | SF-PAY-002 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Bulk refund, scheduled refunds. |
+
+### SF-PAY-005 — Payment Status Synchronization
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Payments |
+| **Description** | Periodic reconciliation polling to detect missed webhooks. |
+| **Actors** | System |
+| **Business Value** | Reliability, anti-fraud. |
+| **Priority** | P1 |
+| **Dependencies** | SF-PAY-003 |
+| **MoSCoW** | Should Have (MVP) |
+| **Future Extension** | ML-based anomaly detection. |
+
+---
+
+## 20. Feature Catalog — Media Module (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-03.** Media was previously referenced as `SF-MED-001` and `SF-PLT-007`. This module formalizes media lifecycle.
+
+### SF-MED-001 — Image Upload
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Media |
+| **Description** | Upload images via signed upload to Cloudinary; store reference. |
+| **Actors** | Catalog Manager |
+| **Business Value** | Product content creation. |
+| **Priority** | P0 |
+| **Dependencies** | — |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Bulk upload, drag-and-drop reorder. |
+
+### SF-MED-002 — Image Optimization
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Media |
+| **Description** | Auto-generate responsive variants (thumbnail, card, hero) via Cloudinary transformations. |
+| **Actors** | System |
+| **Business Value** | Performance, bandwidth. |
+| **Priority** | P0 |
+| **Dependencies** | SF-MED-001 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | AVIF/WebP with fallback. |
+
+### SF-MED-003 — Image Retrieval
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Media |
+| **Description** | Retrieve image via CDN URL with transformation parameters. |
+| **Actors** | System, Customer |
+| **Business Value** | Fast image delivery. |
+| **Priority** | P0 |
+| **Dependencies** | SF-MED-002 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Smart cropping (face/center). |
+
+---
+
+## 21. Feature Catalog — Tax Module (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-04.** Vietnamese VAT compliance was a critical gap.
+
+### SF-TAX-001 — VAT Calculation
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Tax |
+| **Description** | Calculate VAT (default 10%) per line item and order total. |
+| **Actors** | System |
+| **Business Value** | Vietnamese tax compliance. |
+| **Priority** | P0 |
+| **Dependencies** | — |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | Per-category VAT rates. |
+
+### SF-TAX-002 — VAT Display
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Tax |
+| **Description** | Display VAT as separate line on cart, checkout, order, and invoice. |
+| **Actors** | Customer, Admin |
+| **Business Value** | Transparency; compliance. |
+| **Priority** | P0 |
+| **Dependencies** | SF-TAX-001 |
+| **MoSCoW** | Must Have (MVP) |
+| **Future Extension** | VAT-inclusive vs VAT-exclusive toggle. |
+
+### SF-TAX-003 — Tax-Exempt Categories
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Tax |
+| **Description** | Allow admin to mark product categories as tax-exempt with audit trail. |
+| **Actors** | Admin |
+| **Business Value** | Compliance flexibility. |
+| **Priority** | P2 |
+| **Dependencies** | SF-TAX-001 |
+| **MoSCoW** | Could Have (V1.1) |
+| **Future Extension** | Tax engine integration with authorities. |
+
+### SF-TAX-004 — VAT Reporting
+
+| Attribute | Value |
+| --- | --- |
+| **Module** | Tax |
+| **Description** | Generate VAT report (taxable sales, VAT collected) for finance. |
+| **Actors** | Finance Staff |
+| **Business Value** | Tax filing preparation. |
+| **Priority** | P1 |
+| **Dependencies** | SF-TAX-001 |
+| **MoSCoW** | Should Have (MVP) |
+| **Future Extension** | E-invoice integration with tax authority. |
+
+---
+
+## 22. Cross-Module Sub-Features (Updated)
 
 These features span multiple modules; tracked separately for clarity.
 
-### SF-X-001 — Inventory Reservation
+> **Note:** Inventory-related cross-cutting concerns have been moved to the dedicated Inventory module (SF-INV-001..005). This section retains only non-inventory cross-cutting features.
+
+### SF-X-001 — Inventory Reservation [DEPRECATED — Superseded by SF-INV-002]
 
 | Attribute | Value |
 | --- | --- |
 | **Module** | Inventory (cross-cutting) |
-| **Description** | Reserve stock at cart-add (15 min) and order-create (until fulfillment). |
+| **Description** | **DEPRECATED in v1.0.** Use SF-INV-002 (Stock Reservation) instead. |
 | **Actors** | System |
 | **Business Value** | Prevents overselling. |
 | **Priority** | P0 |
 | **Dependencies** | SF-CRT-001, SF-ORD-001 |
 | **Future Extension** | Backorder queue. |
+| **Supersedes** | SF-X-001 (cross-cutting) → SF-INV-002 (dedicated module) |
 
-### SF-X-002 — Low Stock Notifications
+### SF-X-002 — Low Stock Notifications [DEPRECATED — Superseded by SF-INV-003]
 
 | Attribute | Value |
 | --- | --- |
 | **Module** | Inventory (cross-cutting) |
-| **Description** | Notify admin when stock falls below threshold. |
+| **Description** | **DEPRECATED in v1.0.** Use SF-INV-003 (Low Stock Alert) instead. |
 | **Actors** | Admin |
 | **Business Value** | Operational efficiency. |
 | **Priority** | P1 |
 | **Dependencies** | — |
 | **Future Extension** | Auto-reorder. |
+| **Supersedes** | SF-X-002 (cross-cutting) → SF-INV-003 (dedicated module) |
 
 ### SF-X-003 — Currency Consistency
 
@@ -1955,10 +2205,14 @@ These features span multiple modules; tracked separately for clarity.
 | Analytics (ANL) | 7 | 3 | 3 | 0 | 1 |
 | Localization (I18) | 5 | 5 | 0 | 0 | 0 |
 | Platform (PLT) | 9 | 7 | 1 | 0 | 1 |
-| Cross-cutting (X) | 3 | 2 | 1 | 0 | 0 |
-| **TOTAL** | **152** | **99** | **36** | **10** | **7** |
+| **Inventory (INV) — NEW** | 5 | 2 | 3 | 0 | 0 |
+| **Payments (PAY) — NEW** | 5 | 4 | 1 | 0 | 0 |
+| **Media (MED) — NEW** | 3 | 3 | 0 | 0 | 0 |
+| **Tax (TAX) — NEW** | 4 | 2 | 1 | 1 | 0 |
+| Cross-cutting (X) — incl. 2 deprecated | 3 | 2 | 1 | 0 | 0 |
+| **TOTAL** | **169** | **110** | **43** | **9** | **7** |
 
-> **Note:** The table above lists all numbered features. The expected production-ready count for Version 1 is approximately **45 unique end-user capabilities**, organized here as 152 atomic system features grouped into 16 modules. Each end-user capability is decomposed into its sub-features (e.g., "Add to Cart" = SF-CRT-001 + SF-X-001 + SF-CAT-007).
+> **Note:** The table above lists all numbered features. The expected production-ready count for Version 1 is approximately **45 unique end-user capabilities**, organized here as 169 atomic system features grouped into 20 modules (16 existing + 4 new). Each end-user capability is decomposed into its sub-features (e.g., "Add to Cart" = SF-CRT-001 + SF-INV-002 + SF-CAT-007). Note: SF-X-001 and SF-X-002 are deprecated in v1.0 and superseded by SF-INV-002 and SF-INV-003 respectively.
 
 ---
 
@@ -1973,9 +2227,9 @@ The following 45 capabilities map to the prioritized end-user functionality of V
 | 3 | Filter products | Catalog | SF-CAT-004 |
 | 4 | View product detail | Catalog | SF-CAT-005, SF-CAT-010, SF-CAT-011, SF-CAT-012, SF-CAT-013 |
 | 5 | View product variants | Catalog | SF-CAT-006 |
-| 6 | See stock status | Catalog | SF-CAT-007, SF-X-001 |
+| 6 | See stock status | Catalog | SF-CAT-007, SF-INV-002 |
 | 7 | View related products | Catalog | SF-CAT-008 |
-| 8 | Add to cart | Cart | SF-CRT-001, SF-X-001 |
+| 8 | Add to cart | Cart | SF-CRT-001, SF-INV-002 |
 | 9 | Manage cart | Cart | SF-CRT-002, SF-CRT-003, SF-CRT-004 |
 | 10 | Guest cart persistence | Cart | SF-CRT-005 |
 | 11 | Cart merge on login | Cart | SF-CRT-006 |
@@ -2016,7 +2270,155 @@ The following 45 capabilities map to the prioritized end-user functionality of V
 
 ---
 
-## 22. Future Extensions (V1.5+ and V2)
+## 22. MoSCoW Prioritization (Updated per REVIEW_REPORT.md)
+
+> **Added per REVIEW_REPORT.md.** MoSCoW prioritization reduces MVP to a startup-feasible scope.
+
+### 22.1 MVP Scope (Must Have + Should Have)
+
+| MoSCoW | Count | Description |
+| --- | --- | --- |
+| **Must Have (M)** | 50 | Required for V1.0 GA; cannot ship without |
+| **Should Have (S)** | 12 | Important; can ship with workaround if necessary |
+| **Could Have (C)** | 6 | Delighters; include if capacity allows |
+| **Won't Have (W)** | 18 | Explicitly deferred to V1.1, V1.5, or V2 |
+| **Sub-total (new modules)** | 17 | New INV, PAY, MED, TAX modules (all Must for MVP) |
+| **Total in Scope** | **85** | Includes new modules; rounded to **40–60 Core Features** when collapsed to end-user capabilities |
+| **Total Deferred** | **18** | Will be added in V1.1+ |
+
+### 22.2 MVP Feature List (50 Must-Have + 12 Should-Have = 62 Features)
+
+| # | Feature ID | Description | Module | MoSCoW |
+| --- | --- | --- | --- | --- |
+| 1 | SF-CAT-001 | Product Listing | Catalog | Must |
+| 2 | SF-CAT-002 | Category Browsing | Catalog | Must |
+| 3 | SF-CAT-003 | Product Search | Catalog | Must |
+| 4 | SF-CAT-004 | Product Filtering | Catalog | Must |
+| 5 | SF-CAT-005 | Product Detail Page | Catalog | Must |
+| 6 | SF-CAT-006 | Product Variants | Catalog | Must |
+| 7 | SF-CAT-007 | Stock Status Display | Catalog | Must |
+| 8 | SF-CAT-010 | Image Gallery | Catalog | Must |
+| 9 | SF-CAT-012 | Technical Specs | Catalog | Must |
+| 10 | SF-CAT-013 | Warranty Display | Catalog | Must |
+| 11 | SF-CAT-014 | SEO URLs | Catalog | Must |
+| 12 | SF-CAT-015 | JSON-LD Structured Data | Catalog | Must |
+| 13 | SF-CRT-001 | Add to Cart | Cart | Must |
+| 14 | SF-CRT-002 | View Cart | Cart | Must |
+| 15 | SF-CRT-003 | Update Line | Cart | Must |
+| 16 | SF-CRT-004 | Remove Line | Cart | Must |
+| 17 | SF-CRT-005 | Guest Cart Persistence | Cart | Must |
+| 18 | SF-CRT-006 | Cart Merge on Login | Cart | Must |
+| 19 | SF-CRT-007 | Cart Totals | Cart | Must |
+| 20 | SF-CHK-001 | Multi-Step Checkout | Checkout | Must |
+| 21 | SF-CHK-002 | Guest Checkout | Checkout | Must |
+| 22 | SF-CHK-003 | Address Management | Checkout | Must |
+| 23 | SF-CHK-004 | Phone Validation | Checkout | Must |
+| 24 | SF-CHK-005 | Shipping Selection | Checkout | Must |
+| 25 | SF-CHK-006 | Payment Selection | Checkout | Must |
+| 26 | SF-CHK-007 | Order Review | Checkout | Must |
+| 27 | SF-CHK-008 | Payment Redirect | Checkout | Must |
+| 28 | SF-CHK-009 | Payment Callback | Checkout | Must |
+| 29 | SF-CHK-010 | Double-Submit Prevention | Checkout | Must |
+| 30 | SF-CHK-011 | Order Confirmation | Checkout | Must |
+| 31 | SF-ORD-001 | Order Creation | Order | Must |
+| 32 | SF-ORD-002 | Order Number | Order | Must |
+| 33 | SF-ORD-003 | Lifecycle Management | Order | Must |
+| 34 | SF-ORD-004 | Status History | Order | Must |
+| 35 | SF-ORD-005 | Order History (Customer) | Order | Must |
+| 36 | SF-ORD-006 | Order Detail View | Order | Must |
+| 37 | SF-ORD-007 | Admin Status Update | Order | Must |
+| 38 | SF-ORD-008 | Invoice PDF | Order | Must |
+| 39 | SF-ORD-011 | Order Cancellation | Order | Must |
+| 40 | SF-SHP-001 | Fee Calculation | Shipping | Must |
+| 41 | SF-SHP-002 | Carrier Integration | Shipping | Must |
+| 42 | SF-SHP-003 | Shipment Creation | Shipping | Must |
+| 43 | SF-SHP-004 | Label Generation | Shipping | Must |
+| 44 | SF-SHP-005 | Tracking Number | Shipping | Must |
+| 45 | SF-SHP-006 | Tracking Sync | Shipping | Must |
+| 46 | SF-SHP-007 | Customer Tracking View | Shipping | Must |
+| 47 | SF-SHP-009 | Delivery Confirmation | Shipping | Must |
+| 48 | SF-SHP-010 | Shipping Zones | Shipping | Must |
+| 49 | SF-ID-001 | Registration | Identity | Must |
+| 50 | SF-ID-004 | Login | Identity | Must |
+| 51 | SF-ID-007 | Profile Management | Identity | Must |
+| 52 | SF-ID-008 | Address Book | Identity | Must |
+| 53 | SF-ID-010 | Logout | Identity | Must |
+| 54 | SF-ID-011 | Admin MFA | Identity | Must |
+| 55 | SF-ID-013 | Account Lockout | Identity | Must |
+| 56 | SF-NOT-001 | Transactional Email | Notifications | Must |
+| 57 | SF-RVW-001 | Submit Review | Reviews | Should |
+| 58 | SF-RVW-005 | Aggregated Rating | Reviews | Should |
+| 59 | SF-PRM-001 | Percentage Discount | Promotions | Must |
+| 60 | SF-PRM-005 | Voucher Codes | Promotions | Must |
+| 61 | SF-RTN-001 | Return Request | Returns | Must |
+| 62 | SF-RTN-006 | Refund Processing | Returns | Must |
+| 63 | SF-ADM-001 | Admin Dashboard | Admin | Must |
+| 64 | SF-ADM-002 | Product Management | Admin | Must |
+| 65 | SF-ADM-003 | Order Management | Admin | Must |
+| 66 | SF-ADM-005 | Promotion Management | Admin | Must |
+| 67 | SF-ADM-009 | Admin User Mgmt | Admin | Must |
+| 68 | SF-ADM-010 | Audit Log | Admin | Must |
+| 69 | SF-PLT-001 | Health Endpoint | Platform | Must |
+| 70 | SF-PLT-002 | Version Endpoint | Platform | Must |
+| 71 | SF-PLT-007 | Cloudinary Integration | Platform | Must |
+| 72 | SF-PLT-008 | Cookie Consent | Platform | Must |
+| 73 | SF-PLT-009 | Static Pages | Platform | Must |
+| 74 | SF-I18-001 | Vietnamese UI | Localization | Must |
+| 75 | SF-X-003 | Currency Consistency | Cross-cutting | Must |
+| 76 | SF-INV-001 | Stock Tracking | Inventory | Must |
+| 77 | SF-INV-002 | Stock Reservation | Inventory | Must |
+| 78 | SF-PAY-001 | Payment Intent | Payments | Must |
+| 79 | SF-PAY-002 | Payment Processing | Payments | Must |
+| 80 | SF-PAY-003 | Payment Webhook | Payments | Must |
+| 81 | SF-PAY-004 | Refund | Payments | Must |
+| 82 | SF-MED-001 | Image Upload | Media | Must |
+| 83 | SF-MED-002 | Image Optimization | Media | Must |
+| 84 | SF-MED-003 | Image Retrieval | Media | Must |
+| 85 | SF-TAX-001 | VAT Calculation | Tax | Must |
+| 86 | SF-TAX-002 | VAT Display | Tax | Must |
+
+### 22.3 Deferred Features (Won't Have — V1.0)
+
+These features are **explicitly deferred** from V1.0 MVP to reduce scope. They retain their SF-IDs and are tracked in the RTM as future scope.
+
+| Feature ID | Description | Deferred To | Reason |
+| --- | --- | --- | --- |
+| SF-CAT-008 | Related Products | V1.1 | Cross-sell not launch-critical |
+| SF-CAT-009 | Product Comparison | V1.1 | Considered purchasing |
+| SF-CAT-011 | Product Video | V1.1 | Asset production burden |
+| SF-CAT-016 | Recently Viewed | V1.1 | Engagement |
+| SF-CRT-008 | Wishlist | V1.1 | Engagement; not core commerce |
+| SF-CRT-009 | Move Wishlist to Cart | V1.1 | Depends on wishlist |
+| SF-CRT-010 | Abandoned Cart Email | V1.1 | Marketing optimization |
+| SF-CHK-012 | Checkout State Recovery | V1.1 | Reduces friction but adds complexity |
+| SF-ORD-009 | Picklist | V1.1 | Manual pickup acceptable initially |
+| SF-ORD-010 | Partial Shipment | V1.1 | Operational complexity |
+| SF-ORD-012 | Duplicate Detection | V1.1 | Manual review acceptable |
+| SF-ORD-013 | Internal Notes | V1.1 | Internal tool, defer |
+| SF-RVW-003 | Photo Reviews | V1.1 | Moderation load |
+| SF-RVW-007 | Helpful Votes | V1.1 | Engagement |
+| SF-PRM-003 | BOGO | V1.1 | Marketing complexity |
+| SF-PRM-004 | Tiered Discount | V1.1 | Marketing complexity |
+| SF-PRM-006 | Flash Sale | V1.1 | Operational complexity |
+| SF-SUP-002 | Ticket Attachments | V1.1 | Reduces complexity |
+| SF-SUP-004 | Internal Notes | V1.1 | Reduces complexity |
+| SF-ADM-013 | Feature Flag Mgmt (UI) | V1.1 | Flag system used; admin UI deferred |
+| SF-ANL-004 | Cohort Reports | V1.1 | Advanced analytics |
+| SF-PLT-006 | Feature Flag Admin | V1.1 | Couples with SF-ADM-013 |
+
+### 22.4 Future Version Roadmap
+
+| Version | Scope |
+| --- | --- |
+| **V1.0 (MVP — Must Have)** | 62 Core Features (Must + Should) + 17 New Module Features |
+| **V1.1 (3–6 months post-GA)** | All "Won't Have — V1.1" features above |
+| **V1.5 (mid-2027)** | Mobile PWA, AI Sales Assistant, AI Customer Support, multi-language |
+| **V2 (2028)** | Marketplace, multi-seller, commissions, payouts, dispute resolution |
+| **V3 (future)** | International shipping, AR/VR, social commerce, multi-currency |
+
+---
+
+## 23. Future Extensions (V1.5+ and V2)
 
 | Capability | Target Version |
 | --- | --- |
@@ -2031,11 +2433,12 @@ The following 45 capabilities map to the prioritized end-user functionality of V
 
 ---
 
-## 23. Document Control
+## 24. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft with 152 features across 16 modules |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added Inventory, Payments, Media, Tax modules (17 features); applied MoSCoW prioritization (62 MVP + 22 deferred); addressed REVIEW_REPORT.md RC-01..04 |
 
 ---
 

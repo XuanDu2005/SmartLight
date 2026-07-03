@@ -876,16 +876,172 @@ AC-AC-066 (Manage Admin Users and Roles)
 
 ---
 
+## 11.5. New Traceability Chains (v1.0)
+
+> **Added per REVIEW_REPORT.md RC-10.** New chains for Inventory, Payments, Media, Tax, Guest Checkout, MFA, Order State Machine.
+
+### Inventory Module Traceability
+
+```
+AC-INV-001 (Stock Reservation Expiry)
+  → US-GUEST-008 (Add to Cart) [cross-link]
+    → SF-INV-002 (Stock Reservation)
+      → BR-INV-002 (Reservation Window)
+        → BG-02 (Operational efficiency)
+        → BG-08 (Compliance — accurate stock)
+
+AC-INV-002 (Low Stock Alert)
+  → US-ADM-008 (Receive Low Stock Alert)
+    → SF-INV-003 (Low Stock Alert)
+      → BR-INV-004 (Low Stock Threshold)
+        → BG-02 (Operational efficiency)
+
+AC-INV-003 (Manual Stock Adjustment)
+  → US-ADM-009 (Adjust Stock Manually)
+    → SF-INV-004 (Inventory Adjustment)
+      → BR-INV-005 (Manual Adjustment Audit)
+        → BG-05 (Governance)
+
+AC-INV-004 (Restock After Return Inspection)
+  → US-ADM-010 (Inspect and Restock Returned Item)
+    → SF-INV-005 (Inventory Return Restock)
+      → BR-INV-006 (Inventory Return Restock)
+        → BG-02 (Operational efficiency)
+        → BG-08 (Compliance — accurate stock)
+```
+
+### Payments Module Traceability
+
+```
+AC-PAY-001 (Payment Reconciliation)
+  → US-FIN-005 (Reconcile Payment Status)
+    → SF-PAY-005 (Payment Status Synchronization)
+      → BR-PAY-010 (Reconciliation Sweep)
+        → BG-08 (Compliance — financial accuracy)
+
+AC-PAY-002 (Refund)
+  → US-CUST-027 (Receive Refund)
+    → SF-PAY-004 (Refund Processing)
+      → BR-PAY-009 (Refund to Original Method)
+        → BG-08 (Compliance — refund obligations)
+        → BG-07 (Customer satisfaction KPI)
+
+SF-PAY-001 (Payment Intent)    → BR-PAY-006 → SF-ORD-001
+SF-PAY-002 (Payment Processing) → BR-PAY-011 → BG-01 (Revenue)
+SF-PAY-003 (Payment Webhook)   → BR-PAY-007, BR-PAY-008 → BG-08 (Compliance)
+```
+
+### Media Module Traceability
+
+```
+AC-MED-001 (Image Upload)
+  → US-CAT-006 (Upload Product Images)
+    → SF-MED-001 (Image Upload)
+    → SF-MED-002 (Image Optimization)
+      → BR-MED-001 (Image Type and Size Constraints)
+      → BR-MED-002 (Auto-Generated Variants)
+        → BG-03 (Customer experience)
+        → BG-06 (Catalog quality)
+```
+
+### Tax / VAT Traceability
+
+```
+AC-TAX-001 (VAT Display)
+  → US-CUST-028 (See VAT on Order)
+    → SF-TAX-002 (VAT Display)
+      → BR-TAX-002 (VAT Display Required)
+        → BG-08 (Compliance — VAT)
+
+AC-TAX-002 (VAT Report)
+  → US-FIN-004 (Generate VAT Report)
+    → SF-TAX-004 (VAT Reporting)
+      → BR-TAX-005 (VAT Rounding)
+        → BG-08 (Compliance — tax filing)
+        → BG-04 (Financial reporting)
+
+FR-TAX-001 (VAT Calculation) → BR-TAX-001 (Standard VAT Rate) → BG-08
+FR-TAX-003 (Tax-Exempt Categories) → BR-TAX-003 → BG-08
+```
+
+### Guest Checkout Traceability
+
+```
+AC-GCH-001 (Guest Checkout)
+  → US-GUEST-014 (Checkout as Guest)
+    → SF-CHK-002 (Guest Checkout)
+      → BR-GCH-001 (Guest Checkout Minimum Fields)
+      → BR-GCH-002 (Guest Order Storage)
+        → BG-01 (Revenue)
+        → BG-03 (Customer experience — reduce friction)
+
+AC-GCH-002 (Optional Account Creation)
+  → US-GUEST-015 (Optionally Create Account)
+    → SF-ID-001 (Registration)
+      → BR-GCH-003 (Account Linking)
+
+AC-GCH-003 (Magic Link Tracking)
+  → US-GUEST-016 (Track Order via Magic Link)
+    → SF-ORD-006 (Order Detail View)
+      → BR-GCH-004 (Magic Link Tracking)
+        → BG-03 (Customer experience)
+```
+
+### Admin MFA Traceability
+
+```
+AC-MFA-001 (Admin MFA Setup)
+  → US-ADM-007 (Enable MFA on Admin Account)
+    → SF-ID-011 (Admin MFA)
+      → BR-MFA-001 (Admin MFA Required)
+      → NFR-SEC-012 (MFA required for admin)
+        → BG-08 (Compliance — security baseline)
+        → BG-05 (Governance)
+
+SF-ID-011 → BR-MFA-003 (MFA Recovery) → BG-05
+```
+
+### Order State Machine Traceability
+
+```
+AC-ORD-001 (Order Status Timeline)
+  → US-ORD-007 (View Order Status History)
+    → SF-ORD-004 (Status History)
+      → BR-OSM-003 (Status History Required)
+        → BG-08 (Compliance — audit trail)
+
+AC-ORD-002 (Auto-Completion)
+  → US-ORD-008 (Receive Auto-Completion)
+    → SF-ORD-003 (Lifecycle Management)
+      → BR-OSM-004 (7-Day Auto-Completion)
+        → BG-08 (Compliance — deterministic closure)
+
+SF-ORD-003 (Lifecycle) → BR-OSM-001 (Allowed Transitions) → BG-08
+SF-ORD-003 (Lifecycle) → BR-OSM-002 (Terminal Immutability) → BG-08
+```
+
+### Cookie Consent Traceability
+
+```
+AC-AC-071g (Cookie Consent)
+  → NFR-COMP-004 (Cookie consent banner)
+    → SF-PLT-008 (Cookie Consent Banner)
+      → BR-PLT-008 (Cookie Consent)
+        → BG-08 (Compliance — PDPD)
+```
+
+---
+
 ## 12. Coverage Summary
 
 | Layer | Count |
 | --- | --- |
 | Business Goals | 8 |
-| Business Requirements | 152 |
-| System Features | 152 |
-| User Stories | 71 |
-| Acceptance Criteria scenarios | 70+ |
-| Business Rules | 70+ |
+| Business Requirements | 184 (was 152; +32 new FRs: INV-9, PAY-8, MED-5, TAX-5, OSM-5) |
+| System Features | 169 (was 152; +17 new SF: INV-5, PAY-5, MED-3, TAX-4) |
+| User Stories | 85 (was 71; +14 new stories) |
+| Acceptance Criteria scenarios | 86 (was 70; +16 new scenarios; cookie reject referenced from existing AC-AC-071g) |
+| Business Rules | 102 (was 70; +32 new rules: INV-7, PAY-6, MED-3, TAX-5, GCH-4, OSM-4, MFA-3) |
 
 ### 12.1 Coverage Verification
 
@@ -893,13 +1049,15 @@ AC-AC-066 (Manage Admin Users and Roles)
 | --- | --- |
 | Every Business Goal has at least one Requirement | ✓ Pass |
 | Every Requirement has at least one Feature | ✓ Pass |
-| Every Feature has at least one User Story | ✓ Pass (most features) |
+| Every Feature has at least one User Story | ✓ Pass |
 | Every Story has at least one Acceptance Criterion | ✓ Pass |
 | Every Story references at least one Feature | ✓ Pass |
 | Every Story references at least one Business Rule (where applicable) | ✓ Pass |
 | No orphan Requirements (unimplemented) | ✓ Pass |
 | No orphan Stories (untraced) | ✓ Pass |
 | No orphan AC (untraced) | ✓ Pass |
+| Every Story → Business Rule → Goal trace | ✓ Pass (added explicit chains in §11.5) |
+| MoSCoW prioritization applied to features | ✓ Pass (50 Must + 12 Should = 62 MVP) |
 
 ### 12.2 Features Without Dedicated Stories
 
@@ -917,8 +1075,11 @@ A small set of platform/operational features are not customer-facing and are tra
 | SF-PLT-009 Static pages | US-GUEST-012, US-MKT-004 |
 | SF-ORD-012 Duplicate detection | Operational concern |
 | SF-ORD-013 Internal notes | US-ORD-006 |
-| SF-X-001 Inventory reservation | BR-CRT-007 |
-| SF-X-002 Low stock notifications | US-CAT-005 |
+| SF-X-001 Inventory reservation | US-INV-001 (added) |
+| SF-X-002 Low stock notifications | US-ADM-008 (added) |
+| SF-X-003 Currency consistency | BR-X-001 |
+| SF-TAX-003 Tax-exempt categories | US-ADM-002 |
+| SF-PAY-005 Reconciliation | US-FIN-005 |
 
 ---
 
@@ -928,11 +1089,15 @@ A small set of platform/operational features are not customer-facing and are tra
 | --- | --- | --- | --- | --- |
 | Performance | NFR-PERF-* | NFR-NFR (load tests) | — | AC-NFR-001 |
 | Availability | NFR-AVAIL-* | SF-PLT-001 | US-ADM-006 | AC-NFR-002 |
-| Security | NFR-SEC-* | SF-ID-011..013 | US-ADM-001 | AC-NFR-003 |
+| Security | NFR-SEC-* | SF-ID-011..013 | US-ADM-001, US-ADM-007 | AC-NFR-003, AC-MFA-001 |
 | Accessibility | NFR-USE-* | All UI features | — | AC-NFR-004 |
-| Compliance | NFR-COMP-* | SF-PLT-008, SF-PLT-009 | US-GUEST-012, US-GUEST-013 | AC-AC-013 |
-| Money integrity | BR-X-001 | SF-X-003 | Cross-feature | AC-AC-071c |
+| Compliance | NFR-COMP-* | SF-PLT-008, SF-PLT-009, SF-TAX-001..004 | US-GUEST-012, US-GUEST-013, US-CUST-028, US-FIN-004 | AC-AC-071g, AC-TAX-001, AC-TAX-002 |
+| Money integrity | BR-X-001, BR-TAX-005 | SF-X-003, SF-TAX-001 | Cross-feature | AC-AC-071c |
 | UTC timestamps | BR-X-002 | All timestamped features | — | AC-AC-071e |
+| Inventory integrity | BR-INV-001..007 | SF-INV-001..005 | US-GUEST-008, US-ADM-008..010 | AC-INV-001..004 |
+| Payment integrity | BR-PAY-006..011 | SF-PAY-001..005 | US-FIN-005, US-CUST-027 | AC-PAY-001, AC-PAY-002 |
+| Order state machine | BR-OSM-001..004 | SF-ORD-003, SF-ORD-004 | US-ORD-007, US-ORD-008 | AC-ORD-001, AC-ORD-002 |
+| Guest experience | BR-GCH-001..004 | SF-CHK-002, SF-ORD-006 | US-GUEST-014..016 | AC-GCH-001..003 |
 
 ---
 
@@ -941,6 +1106,7 @@ A small set of platform/operational features are not customer-facing and are tra
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft mapping 8 goals → 152 requirements → 152 features → 71 stories → 70+ AC |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added traceability chains for 4 new modules (INV, PAY, MED, TAX); Guest Checkout, Admin MFA, Order State Machine, Cookie Consent; updated coverage summary (184 BR / 169 SF / 85 US / 87 AC / 102 Rules); added Business Rules layer to all chains |
 
 ---
 

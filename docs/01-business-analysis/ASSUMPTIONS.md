@@ -576,11 +576,148 @@ This is a **living document**. New assumptions are added when discovered; invali
 
 ---
 
-## 15. Document Control
+## 15. New Assumptions (v1.0)
+
+> **Added per REVIEW_REPORT.md.** These assumptions cover the new modules and clarified flows.
+
+### ASM-VAT-01 — VAT Rate Stability
+
+| Field | Value |
+| --- | --- |
+| **Category** | Compliance |
+| **Reason** | The 10% standard VAT rate is assumed stable for the V1.0 timeframe. Changes to VAT rate are a configuration change, not a code change. |
+| **Risk** | Government changes the VAT rate unexpectedly; rate changes mid-flight orders could be disputed. |
+| **Impact** | Mid — VAT snapshot at order time mitigates this; historical orders remain at the rate they were created with. |
+| **Mitigation** | VAT rate stored on OrderLine; admin can update rate via configuration; finance staff review monthly. |
+
+### ASM-VAT-02 — Single VAT Rate Sufficient for V1.0
+
+| Field | Value |
+| --- | --- |
+| **Category** | Compliance |
+| **Reason** | Vietnam uses 0%, 5%, 8%, and 10% VAT rates; SmartLight V1.0 only needs 10% (standard) and 0% (exempt). 5%/8% rates are not required. |
+| **Risk** | A product category requires 5% or 8% VAT in V1.0. |
+| **Impact** | Low — admin can mark categories as exempt; per-rate configuration is V1.1. |
+| **Mitigation** | Defer per-rate VAT to V1.1; document limitation in admin training. |
+
+### ASM-MFA-01 — TOTP Apps Available
+
+| Field | Value |
+| --- | --- |
+| **Category** | Identity |
+| **Reason** | All admin staff have or can install a TOTP authenticator app (Google Authenticator, Authy, 1Password). |
+| **Risk** | Admin staff lack smartphones or refuse to install authenticator apps. |
+| **Impact** | Medium — could block admin onboarding. |
+| **Mitigation** | Provide printed recovery codes; allow admin to use hardware keys (YubiKey) in V1.1. |
+
+### ASM-MFA-02 — Customer MFA Not Required
+
+| Field | Value |
+| --- | --- |
+| **Category** | Identity |
+| **Reason** | Customer MFA is deferred to V1.5 to reduce onboarding friction for V1.0. Customers rely on password + email verification. |
+| **Risk** | Customer accounts compromised via password reuse. |
+| **Impact** | Medium — risk mitigated by Argon2id hashing, account lockout, and breach monitoring. |
+| **Mitigation** | Optional customer MFA in V1.5; admin can force-reset compromised accounts. |
+
+### ASM-INV-01 — Single Warehouse
+
+| Field | Value |
+| --- | --- |
+| **Category** | Operations |
+| **Reason** | V1.0 operates from a single warehouse in HCMC; multi-warehouse is deferred to V1.5+. |
+| **Risk** | Shipping times to North Vietnam are too long; need second warehouse. |
+| **Impact** | Medium — affects customer satisfaction but not architecture (multi-warehouse is additive). |
+| **Mitigation** | Monitor shipping times; open second warehouse in Hanoi by V1.5 if needed. |
+
+### ASM-INV-02 — Manual Stock Reconciliation Acceptable
+
+| Field | Value |
+| --- | --- |
+| **Category** | Operations |
+| **Reason** | Stock discrepancies will be reconciled manually by admin via the adjustment workflow, not by automated cycle counts. |
+| **Risk** | Stock drift grows; customer orders unfulfillable. |
+| **Impact** | Low — adjustments are auditable and reversible within 90 days. |
+| **Mitigation** | Daily inventory reports flag unusual adjustments; monthly physical cycle counts by admin. |
+
+### ASM-PAY-01 — Single Payment Provider at Launch
+
+| Field | Value |
+| --- | --- |
+| **Category** | Payment |
+| **Reason** | V1.0 launches with one payment provider (e.g., VNPay) covering card, bank transfer, and wallet. Multi-provider orchestration is V1.5+. |
+| **Risk** | Provider outage causes revenue loss. |
+| **Impact** | Medium — outage would block checkout. |
+| **Mitigation** | Provider SLA monitoring; status page on storefront; second provider added in V1.5. |
+
+### ASM-PAY-02 — Webhook Reliability
+
+| Field | Value |
+| --- | --- |
+| **Category** | Payment |
+| **Reason** | Payment provider webhooks may be delayed, lost, or duplicated. Idempotency and reconciliation handle this. |
+| **Risk** | Orders stuck in Pending indefinitely; customer complaints. |
+| **Impact** | High if not handled. |
+| **Mitigation** | Idempotent webhook (BR-PAY-007); signature verification (BR-PAY-008); hourly reconciliation (BR-PAY-010); Sev-2 alert after 24h unresolved. |
+
+### ASM-PAY-03 — Refunds Within Provider Window
+
+| Field | Value |
+| --- | --- |
+| **Category** | Payment |
+| **Reason** | Refunds must be processed within the provider's refund window (typically 90–180 days). |
+| **Risk** | Customer requests refund outside provider window. |
+| **Impact** | Low — manual bank transfer for edge cases; flagged for finance review. |
+| **Mitigation** | System warns admin if refund window exceeded; manual transfer flow documented. |
+
+### ASM-MED-01 — Cloudinary Sufficient for V1.0
+
+| Field | Value |
+| --- | --- |
+| **Category** | Media |
+| **Reason** | Cloudinary's free/entry tier supports SmartLight's expected image volume (~10,000 images, ~50 GB). |
+| **Risk** | Volume exceeds tier; bills increase. |
+| **Impact** | Low — pricing scales linearly; migration to S3 + Lambda is straightforward. |
+| **Mitigation** | Monitor usage; upgrade tier before hitting ceiling. |
+
+### ASM-GCH-01 — Guests Prefer No Account
+
+| Field | Value |
+| --- | --- |
+| **Category** | User Behavior |
+| **Reason** | Vietnamese e-commerce conversion research shows 60%+ of first purchases are guest checkouts. |
+| **Risk** | Lower repeat-purchase rate without accounts. |
+| **Impact** | Medium — affects LTV. |
+| **Mitigation** | Optional account creation at checkout; magic link tracking; post-purchase email encourages registration. |
+
+### ASM-GCH-02 — Email Deliverability is Reliable
+
+| Field | Value |
+| --- | --- |
+| **Category** | Identity |
+| **Reason** | Magic link and verification emails are assumed to reach users within 5 minutes. |
+| **Risk** | Email providers block SmartLight's sending domain (SPF/DKIM misconfig). |
+| **Impact** | High — blocks account creation, guest tracking, password reset. |
+| **Mitigation** | SPF/DKIM/DMARC configured; transactional email provider (Resend/SES); bounce monitoring. |
+
+### ASM-OSM-01 — State Machine is Sufficient
+
+| Field | Value |
+| --- | --- |
+| **Category** | Order Management |
+| **Reason** | The 8-state order lifecycle (Pending → Confirmed → Processing → Shipped → Delivered → Completed, with Cancelled/Returned branches) covers all V1.0 fulfillment scenarios. |
+| **Risk** | Edge case requires additional state (e.g., On Hold, Awaiting Pickup). |
+| **Impact** | Low — additional states can be added without breaking existing transitions. |
+| **Mitigation** | State machine schema is extensible; admin can manually annotate via internal notes (V1.1). |
+
+---
+
+## 16. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft with 41 assumptions across 8 categories |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added 12 new assumptions covering VAT, MFA, Inventory, Payments, Media, Guest Checkout, and Order State Machine; addressed REVIEW_REPORT.md gaps |
 
 ---
 

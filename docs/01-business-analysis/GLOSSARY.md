@@ -1262,11 +1262,270 @@ See **Ticket**.
 
 ---
 
-## 26. Document Control
+## 26. New Glossary Terms (v1.0)
+
+> **Added per REVIEW_REPORT.md.** Covers VAT, MFA, payment, inventory, and media terminology.
+
+### VAT (Value Added Tax)
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Thuế Giá trị Gia tăng (VAT / GTGT) |
+| **Definition** | Vietnamese consumption tax applied at 10% (default) to taxable goods and services. Calculated per line item and displayed separately on orders and invoices. |
+| **Context** | BR-TAX-001..005; FR-TAX-001..005. |
+| **Related** | Tax-Exempt Category, Invoice |
+
+### VAT-Exempt Category
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Danh mục không chịu thuế |
+| **Definition** | A product category marked by admin where VAT = 0%. |
+| **Context** | Audit logged; annual review required. |
+| **Related** | VAT |
+
+### VAT Rate Snapshot
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Thuế suất VAT tại thời điểm bán |
+| **Definition** | The VAT rate and amount captured at the time of order creation and immutable thereafter, even if the rate changes. |
+| **Context** | OrderLine stores taxRate, taxAmount. |
+| **Related** | VAT, Order |
+
+### MFA (Multi-Factor Authentication)
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Xác thực đa yếu tố |
+| **Definition** | Authentication requiring two or more factors: password (knowledge) + TOTP code (possession). Mandatory for all admin users in V1.0. |
+| **Context** | BR-MFA-001; FR-ID-011. |
+| **Related** | TOTP, Admin |
+
+### TOTP (Time-Based One-Time Password)
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Mật khẩu một lần theo thời gian |
+| **Definition** | RFC 6238 algorithm generating a 6-digit code from a shared secret and current time, valid for 30 seconds. Used as the second factor in admin MFA. |
+| **Context** | Compatible with Google Authenticator, Authy, 1Password. |
+| **Related** | MFA |
+
+### Payment Intent
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Ý định thanh toán |
+| **Definition** | An object created with the payment provider representing an intent to collect funds. Bound to exactly one order. |
+| **Context** | SF-PAY-001, BR-PAY-006. |
+| **Related** | Payment Webhook, Refund |
+
+### Payment Webhook
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Webhook thanh toán |
+| **Definition** | An HTTP callback from the payment provider notifying the system of payment events (success, failure, refund). Signature-verified. |
+| **Context** | SF-PAY-003, BR-PAY-007, BR-PAY-008. |
+| **Related** | Payment Intent, Idempotency Key |
+
+### Idempotency Key
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Khóa idempotency |
+| **Definition** | A unique identifier sent with payment operations to prevent duplicate processing on retry. |
+| **Context** | FR-PAY-007. |
+| **Related** | Payment Webhook |
+
+### Refund
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Hoàn tiền |
+| **Definition** | A reversal of a payment, full or partial, returned to the original payment method. |
+| **Context** | SF-PAY-004, BR-PAY-009. |
+| **Related** | Return, RMA |
+
+### Reconciliation
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Đối soát |
+| **Definition** | Periodic comparison of local order/payment records against the payment provider to detect missed webhooks or discrepancies. |
+| **Context** | SF-PAY-005, BR-PAY-010. Hourly job. |
+| **Related** | Payment Webhook |
+
+### Stock Reservation
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Giữ chỗ tồn kho |
+| **Definition** | A temporary hold on stock (15 minutes) created at add-to-cart, converted to a decrement on order creation. |
+| **Context** | SF-INV-002, BR-INV-002. |
+| **Related** | Stock-on-hand |
+
+### Stock-on-Hand
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Tồn kho khả dụng |
+| **Definition** | The number of units of a product variant currently available for sale (after reservations and decrements). |
+| **Context** | SF-INV-001. |
+| **Related** | Stock Reservation, Inventory Adjustment |
+
+### Inventory Adjustment
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Điều chỉnh tồn kho |
+| **Definition** | A manual change to stock-on-hand with a reason code, recorded in the audit log. |
+| **Context** | SF-INV-004, BR-INV-005. |
+| **Related** | Restock, Disposal |
+
+### Restock
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Nhập kho lại |
+| **Definition** | Returning a previously sold/returned item to sellable stock after inspection. |
+| **Context** | SF-INV-005, BR-INV-006. |
+| **Related** | Inventory Adjustment, Return |
+
+### Disposal
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Thanh lý |
+| **Definition** | Removal of damaged or unsellable items from stock, recorded for audit. |
+| **Context** | BR-INV-006. |
+| **Related** | Restock, Inventory Adjustment |
+
+### Low Stock Threshold
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Ngưỡng tồn kho thấp |
+| **Definition** | A per-variant numeric threshold; when stock-on-hand falls below, an alert is triggered. Default = 5. |
+| **Context** | SF-INV-003, BR-INV-004. |
+| **Related** | Stock-on-hand |
+
+### Image Variant
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Biến thể hình ảnh |
+| **Definition** | An auto-generated responsive rendition of an image (thumbnail, card, hero, zoom) created via Cloudinary transformations. |
+| **Context** | SF-MED-002, BR-MED-002. |
+| **Related** | Media |
+
+### CDN (Content Delivery Network)
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Mạng phân phối nội dung |
+| **Definition** | A geographically distributed network that serves cached content close to users. Cloudinary provides CDN delivery for SmartLight images. |
+| **Context** | SF-MED-003. |
+| **Related** | Image Variant |
+
+### Signed Upload
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Upload có chữ ký |
+| **Definition** | A direct upload mechanism where the client requests a signed upload URL from the server, then uploads directly to the storage provider (Cloudinary). |
+| **Context** | SF-MED-001. |
+| **Related** | Image Upload |
+
+### Guest Order
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Đơn hàng của khách vãng lai |
+| **Definition** | An order placed without a customer account, identified by guestEmail. May later be linked to a customer account. |
+| **Context** | BR-GCH-002, US-GUEST-014..016. |
+| **Related** | Account Linking |
+
+### Magic Link
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Liên kết ma thuật |
+| **Definition** | A one-time, time-limited URL containing an authentication token, sent via email to allow password-less access (e.g., guest order tracking, password reset). |
+| **Context** | BR-GCH-004. 24h expiry, single use. |
+| **Related** | Guest Order, Password Reset |
+
+### Account Linking
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Liên kết tài khoản |
+| **Definition** | The process of attaching prior guest orders to a newly-registered customer account, when emails match. |
+| **Context** | BR-GCH-003. |
+| **Related** | Guest Order |
+
+### Order State Machine
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Máy trạng thái đơn hàng |
+| **Definition** | The formal definition of allowed state transitions for an order: Pending → Confirmed → Processing → Shipped → Delivered → Completed; with branches to Cancelled and Returned. |
+| **Context** | BR-OSM-001..004; SRS §6.20. |
+| **Related** | Status History |
+
+### Status History
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Lịch sử trạng thái |
+| **Definition** | An immutable log of every state transition with fromState, toState, actor, timestamp, and optional reason. |
+| **Context** | BR-OSM-003. |
+| **Related** | Order State Machine |
+
+### Auto-Completion
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Tự động hoàn tất |
+| **Definition** | The scheduled transition of an order from Delivered to Completed after 7 days, unless a return has been filed. |
+| **Context** | BR-OSM-004. |
+| **Related** | Order State Machine |
+
+### Cookie Consent
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Đồng ý cookie |
+| **Definition** | A user-facing mechanism (banner) requesting permission before setting non-essential cookies. Required for PDPD compliance. |
+| **Context** | NFR-COMP-004. |
+| **Related** | PDPD |
+
+### Audit Log
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Nhật ký kiểm toán |
+| **Definition** | An append-only record of sensitive operations, including actor, timestamp, before/after values, and reason. |
+| **Context** | SF-ADM-010, BR-ADM-002, BR-INV-005. |
+| **Related** | RBAC |
+
+### Banker's Rounding
+
+| Field | Value |
+| --- | --- |
+| **Vietnamese** | Làm tròn ngân hàng |
+| **Definition** | Rounding method that rounds to the nearest even number when the value is exactly halfway. Avoids systematic bias. |
+| **Context** | BR-TAX-005 for VAT calculations. |
+| **Related** | VAT |
+
+---
+
+## 27. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft with 100+ business terms and acronyms |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added 25 new terms covering VAT, MFA, Payments, Inventory, Media, Guest Checkout, Order State Machine, Audit, Rounding |
 
 ---
 

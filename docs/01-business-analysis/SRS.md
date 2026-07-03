@@ -571,6 +571,100 @@ The functional requirements are organized by domain (bounded context). Each requ
 | FR-PLT-006 | The system shall log structured events for analytics. |
 | FR-PLT-007 | The system shall integrate with Cloudinary for media optimization. |
 
+### 6.16 Inventory (F-INV) — NEW in v1.0
+
+| ID | Requirement |
+| --- | --- |
+| FR-INV-001 | The system shall maintain stock-on-hand per product variant, single warehouse. |
+| FR-INV-002 | The system shall reserve stock for 15 minutes on add-to-cart and convert reservation to decrement on order creation. |
+| FR-INV-003 | The system shall release reservation on cart abandonment, checkout timeout, or cancellation. |
+| FR-INV-004 | The system shall detect concurrent reservation attempts and serialize stock mutations via database locks. |
+| FR-INV-005 | The system shall notify admin via dashboard banner and email when variant stock falls below a configurable threshold. |
+| FR-INV-006 | The system shall support manual stock adjustments with mandatory reason code and audit trail. |
+| FR-INV-007 | The system shall support restock (return-to-stock) after successful return inspection; non-sellable items shall be flagged for disposal. |
+| FR-INV-008 | The system shall display real-time stock status on PDP (In Stock / Low Stock / Out of Stock). |
+| FR-INV-009 | The system shall reconcile stock on every order state transition (paid, fulfilled, cancelled, returned). |
+
+### 6.17 Payments (F-PAY) — NEW in v1.0
+
+| ID | Requirement |
+| --- | --- |
+| FR-PAY-001 | The system shall create a payment intent via the payment provider, persisting intent ID with the order. |
+| FR-PAY-002 | The system shall support Vietnamese payment providers (VNPay, MoMo, or ZaloPay) configured per environment. |
+| FR-PAY-003 | The system shall receive webhook callbacks from payment provider with signature verification. |
+| FR-PAY-004 | The system shall reconcile payment status on webhook receipt and transition order accordingly. |
+| FR-PAY-005 | The system shall support full and partial refunds through the payment provider, with refund ID stored on the order. |
+| FR-PAY-006 | The system shall periodically poll payment provider for any orders whose webhook was missed (reconciliation job). |
+| FR-PAY-007 | The system shall prevent double-charge via idempotency keys. |
+| FR-PAY-008 | The system shall retain payment transaction logs for at least 2 years for audit and tax reporting. |
+
+### 6.18 Media (F-MED) — NEW in v1.0
+
+| ID | Requirement |
+| --- | --- |
+| FR-MED-001 | The system shall upload product images via signed direct upload to Cloudinary. |
+| FR-MED-002 | The system shall auto-generate responsive variants (thumbnail, card, hero, zoom) via Cloudinary transformations. |
+| FR-MED-003 | The system shall retrieve images via Cloudinary CDN URLs with transformation parameters. |
+| FR-MED-004 | The system shall enforce image type (JPEG, PNG, WebP) and size (≤ 5 MB) constraints. |
+| FR-MED-005 | The system shall associate images with product variants and support image ordering. |
+
+### 6.19 Tax / VAT (F-TAX) — NEW in v1.0
+
+| ID | Requirement |
+| --- | --- |
+| FR-TAX-001 | The system shall calculate VAT (default 10%) on every taxable line item and order. |
+| FR-TAX-002 | The system shall display VAT as a separate line on cart, checkout, order confirmation, and invoice. |
+| FR-TAX-003 | The system shall allow admin to mark product categories as tax-exempt with audit trail. |
+| FR-TAX-004 | The system shall store VAT rate effective at the time of sale for historical accuracy. |
+| FR-TAX-005 | The system shall generate a VAT report (taxable sales, VAT collected) exportable as CSV. |
+
+### 6.20 Order State Machine (NEW in v1.0)
+
+> **Added per REVIEW_REPORT.md RC-07.** The order state machine formalizes the complete lifecycle with allowed/forbidden transitions.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: Order created (unpaid)
+    Pending --> Cancelled: Timeout (15 min) or user cancel
+    Pending --> Confirmed: Payment success
+    Confirmed --> Processing: Admin starts fulfillment
+    Processing --> Shipped: Carrier pickup + tracking created
+    Shipped --> Delivered: Carrier confirmation
+    Delivered --> Completed: Customer confirms / +7 days
+    Delivered --> Returned: Customer requests return
+    Completed --> Returned: Customer requests return (warranty)
+    Confirmed --> Cancelled: Admin cancel before shipment
+    Shipped --> Returned: Carrier lost
+    Cancelled --> [*]
+    Completed --> [*]
+    Returned --> [*]
+```
+
+**Transition Table:**
+
+| From State | To State | Trigger | Actor | Pre-condition |
+| --- | --- | --- | --- | --- |
+| Pending | Confirmed | Payment webhook success | System (payment provider) | Payment intent status = paid |
+| Pending | Cancelled | Timeout 15 min | System (scheduler) | No payment received |
+| Pending | Cancelled | User cancel | Customer or Guest | Order not yet paid |
+| Confirmed | Processing | Start fulfillment | Admin staff | Inventory available |
+| Processing | Shipped | Carrier pickup | Admin staff | Tracking number assigned |
+| Shipped | Delivered | Carrier delivery | System (carrier webhook) | Tracking status = delivered |
+| Delivered | Completed | Customer confirm or +7 days | System / Customer | Delivered date recorded |
+| Delivered | Returned | Customer return request | Customer | Within 7-day window |
+| Completed | Returned | Customer return request | Customer | Within warranty window |
+| Confirmed | Cancelled | Admin cancel | Admin staff | Not yet shipped |
+| Shipped | Returned | Carrier lost | System / Admin | Carrier confirmed lost |
+
+**Forbidden Transitions:**
+
+- `Pending → Shipped` (must go through Confirmed → Processing)
+- `Cancelled → Confirmed` (cancellation is terminal)
+- `Completed → Pending` (immutable after completion)
+- `Returned → Delivered` (returned is terminal)
+- `Any → Pending` (no state may revert to Pending)
+- `Pending → Returned` (cannot return unpaid order)
+
 ---
 
 ## 7. Non-Functional Requirements
@@ -818,11 +912,40 @@ Detailed acceptance criteria for each feature are in `ACCEPTANCE_CRITERIA.md` us
 
 ---
 
-## 12. Document Control
+## 12. Guest Checkout Flow (Clarified per RC-05)
+
+> **Added per REVIEW_REPORT.md.** Guest checkout was previously ambiguous regarding account creation, email verification, and post-purchase behavior.
+
+### 12.1 Guest Checkout Step-by-Step
+
+| Step | Action | System Behavior | Required Data |
+| --- | --- | --- | --- |
+| 1 | Add to cart | No login required | None |
+| 2 | Begin checkout | Prompt for email + shipping address | Email, full name, phone, address |
+| 3 | Optional account creation | Checkbox: "Tạo tài khoản với mật khẩu" | Password (optional) |
+| 4 | Place order (pay) | Order created with `customerId = NULL`, `guestEmail` populated | — |
+| 5 | Email verification | Verification email sent to `guestEmail` (link valid 24h) | — |
+| 6 | Order tracking | Guest accesses via magic link in email | — |
+| 7 | Future login | Guest may register later with same email; order history attaches | — |
+
+### 12.2 Guest Account Linking Rules
+
+| ID | Rule |
+| --- | --- |
+| GCH-01 | If guest checks "Create account" during checkout, a customer account is created post-payment with `emailVerified = true` (verification skipped). |
+| GCH-02 | If guest does not check "Create account", no account is created. Order stored with `guestEmail` only. |
+| GCH-03 | A guest order is linkable to a future customer account if the same email registers later; linking requires email verification. |
+| GCH-04 | Guest order tracking uses a one-time magic link (24h expiry, one-use) sent to `guestEmail`. |
+| GCH-05 | Guest checkout never blocks on account creation; minimum required fields are email, name, phone, address. |
+
+---
+
+## 13. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added Inventory (FR-INV), Payments (FR-PAY), Media (FR-MED), Tax (FR-TAX) sections; Order State Machine with Mermaid diagram; Guest Checkout clarification; addressed REVIEW_REPORT.md RC-05..07 |
 
 ---
 

@@ -337,7 +337,7 @@ Persona codes:
 | **Priority** | P0 |
 | **Story Points** | 8 |
 | **Related Features** | SF-CHK-006, SF-CHK-008, SF-CHK-009 |
-| **Related Rules** | BR-PAY-001, BR-PAY-002, BR-PAY-005 |
+| **Related Rules** | BR-PAY-001, BR-PAY-002, BR-PAY-005, BR-PAY-006, BR-PAY-010 |
 
 ### US-CUST-008 — Receive Order Confirmation Email
 
@@ -493,7 +493,7 @@ Persona codes:
 | **Priority** | P0 |
 | **Story Points** | 3 |
 | **Related Features** | SF-RTN-006 |
-| **Related Rules** | BR-RTN-003, BR-RTN-004, BR-PAY-003 |
+| **Related Rules** | BR-RTN-003, BR-RTN-004, BR-PAY-003, BR-PAY-009 |
 
 ### US-CUST-020 — Submit Support Ticket
 
@@ -765,7 +765,7 @@ Persona codes:
 | **Priority** | P0 |
 | **Story Points** | 3 |
 | **Related Features** | SF-ORD-011 |
-| **Related Rules** | BR-ORD-003, BR-PAY-003 |
+| **Related Rules** | BR-ORD-003, BR-PAY-003, BR-PAY-008 |
 
 ### US-ORD-006 — Add Internal Note to Order
 
@@ -933,7 +933,7 @@ Persona codes:
 | **Priority** | P1 |
 | **Story Points** | 5 |
 | **Related Features** | SF-RTN-006, SF-ADM-006 |
-| **Related Rules** | BR-PAY-003 |
+| **Related Rules** | BR-PAY-003, BR-PAY-008 |
 
 ### US-FIN-003 — Export Reports
 
@@ -1072,11 +1072,200 @@ Persona codes:
 
 ---
 
-## 16. Document Control
+## 16. New User Stories (v1.0)
+
+> **Added per REVIEW_REPORT.md.** These stories cover missing workflows: Guest checkout, Admin MFA, Refund processing, Low stock, Order state transitions, VAT display, Inventory restock.
+
+### US-GUEST-014 — Checkout as Guest
+
+| Field | Value |
+| --- | --- |
+| **As a** | Guest |
+| **I want to** | complete checkout without creating an account |
+| **So that** | I can purchase quickly without registration friction |
+| **Acceptance Criteria** | See AC-GCH-001 |
+| **Priority** | P0 |
+| **Story Points** | 3 |
+| **Related Features** | SF-CHK-002, SF-ORD-001 |
+| **Related Rules** | BR-GCH-001, BR-GCH-002 |
+
+### US-GUEST-015 — Optionally Create Account at Checkout
+
+| Field | Value |
+| --- | --- |
+| **As a** | Guest |
+| **I want to** | tick a checkbox to create an account during checkout |
+| **So that** | I can track my order easily afterward |
+| **Acceptance Criteria** | See AC-GCH-002 |
+| **Priority** | P1 |
+| **Story Points** | 2 |
+| **Related Features** | SF-ID-001, SF-CHK-002 |
+| **Related Rules** | BR-GCH-001 |
+
+### US-GUEST-016 — Track Order via Magic Link
+
+| Field | Value |
+| --- | --- |
+| **As a** | Guest |
+| **I want to** | click a magic link in my email to view my order |
+| **So that** | I can see shipping status without an account |
+| **Acceptance Criteria** | See AC-GCH-003 |
+| **Priority** | P0 |
+| **Story Points** | 2 |
+| **Related Features** | SF-ORD-006, SF-NOT-001 |
+| **Related Rules** | BR-GCH-004 |
+
+### US-CUST-027 — Receive Refund
+
+| Field | Value |
+| --- | --- |
+| **As a** | Customer |
+| **I want to** | receive my refund after returning an item |
+| **So that** | I am made whole when the product is faulty or unwanted |
+| **Acceptance Criteria** | See AC-RFN-001 |
+| **Priority** | P0 |
+| **Story Points** | 3 |
+| **Related Features** | SF-PAY-004, SF-RTN-006 |
+| **Related Rules** | BR-PAY-009 |
+
+### US-CUST-028 — See VAT on Order
+
+| Field | Value |
+| --- | --- |
+| **As a** | Customer |
+| **I want to** | see VAT as a separate line on my order and invoice |
+| **So that** | I understand the tax breakdown of my purchase |
+| **Acceptance Criteria** | See AC-TAX-001 |
+| **Priority** | P0 |
+| **Story Points** | 1 |
+| **Related Features** | SF-TAX-002 |
+| **Related Rules** | BR-TAX-002 |
+
+### US-ADM-007 — Enable MFA on Admin Account
+
+| Field | Value |
+| --- | --- |
+| **As a** | Admin Staff |
+| **I want to** | set up TOTP-based MFA on my admin account |
+| **So that** | my access is protected by two-factor authentication |
+| **Acceptance Criteria** | See AC-MFA-001 |
+| **Priority** | P0 |
+| **Story Points** | 3 |
+| **Related Features** | SF-ID-011 |
+| **Related Rules** | BR-MFA-001, NFR-SEC-012 |
+
+### US-ADM-008 — Receive Low Stock Alert
+
+| Field | Value |
+| --- | --- |
+| **As a** | Catalog Manager |
+| **I want to** | receive an alert when a product is low on stock |
+| **So that** | I can reorder before it sells out |
+| **Acceptance Criteria** | See AC-INV-002 |
+| **Priority** | P1 |
+| **Story Points** | 2 |
+| **Related Features** | SF-INV-003 |
+| **Related Rules** | BR-INV-004 |
+
+### US-ADM-009 — Adjust Stock Manually
+
+| Field | Value |
+| --- | --- |
+| **As a** | Catalog Manager |
+| **I want to** | adjust stock levels manually with a reason |
+| **So that** | inventory discrepancies are corrected and audited |
+| **Acceptance Criteria** | See AC-INV-003 |
+| **Priority** | P1 |
+| **Story Points** | 2 |
+| **Related Features** | SF-INV-004 |
+| **Related Rules** | BR-INV-005 |
+
+### US-ADM-010 — Inspect and Restock Returned Item
+
+| Field | Value |
+| --- | --- |
+| **As a** | Order Fulfillment Staff |
+| **I want to** | inspect returned items and restock sellable ones |
+| **So that** | inventory is accurately recovered from returns |
+| **Acceptance Criteria** | See AC-INV-004 |
+| **Priority** | P1 |
+| **Story Points** | 3 |
+| **Related Features** | SF-INV-005, SF-RTN-006 |
+| **Related Rules** | BR-INV-006 |
+
+### US-ORD-007 — View Order Status History
+
+| Field | Value |
+| --- | --- |
+| **As a** | Customer |
+| **I want to** | see the timeline of my order's status changes |
+| **So that** | I can understand where my order is in fulfillment |
+| **Acceptance Criteria** | See AC-ORD-001 |
+| **Priority** | P1 |
+| **Story Points** | 2 |
+| **Related Features** | SF-ORD-004, SF-ORD-006 |
+| **Related Rules** | BR-OSM-003 |
+
+### US-ORD-008 — Receive Auto-Completion
+
+| Field | Value |
+| --- | --- |
+| **As a** | Customer |
+| **I want to** | have my order auto-complete 7 days after delivery |
+| **So that** | the warranty / return window closes deterministically |
+| **Acceptance Criteria** | See AC-ORD-002 |
+| **Priority** | P2 |
+| **Story Points** | 1 |
+| **Related Features** | SF-ORD-003 |
+| **Related Rules** | BR-OSM-004 |
+
+### US-FIN-004 — Generate VAT Report
+
+| Field | Value |
+| --- | --- |
+| **As a** | Finance Staff |
+| **I want to** | export a VAT report (taxable sales, VAT collected) |
+| **So that** | I can file taxes with Vietnamese authorities |
+| **Acceptance Criteria** | See AC-TAX-002 |
+| **Priority** | P1 |
+| **Story Points** | 3 |
+| **Related Features** | SF-TAX-004, SF-ANL-006 |
+| **Related Rules** | BR-TAX-002, BR-TAX-004 |
+
+### US-FIN-005 — Reconcile Payment Status
+
+| Field | Value |
+| --- | --- |
+| **As a** | Finance Staff |
+| **I want to** | reconcile payment transactions with provider statements |
+| **So that** | missed payments and discrepancies are caught |
+| **Acceptance Criteria** | See AC-PAY-001 |
+| **Priority** | P1 |
+| **Story Points** | 3 |
+| **Related Features** | SF-PAY-005 |
+| **Related Rules** | BR-PAY-005, BR-PAY-010 |
+
+### US-CAT-006 — Upload Product Images
+
+| Field | Value |
+| --- | --- |
+| **As a** | Catalog Manager |
+| **I want to** | upload multiple product images with auto-optimization |
+| **So that** | products look professional across devices |
+| **Acceptance Criteria** | See AC-MED-001 |
+| **Priority** | P0 |
+| **Story Points** | 3 |
+| **Related Features** | SF-MED-001, SF-MED-002 |
+| **Related Rules** | BR-MED-001, BR-MED-002 |
+
+---
+
+## 17. Document Control
 
 | Version | Date | Author | Change Summary |
 | --- | --- | --- | --- |
 | 0.1 | 2026-07-02 | Principal Business Analyst | Initial draft with 71 stories across 9 personas |
+| 1.0 | 2026-07-03 | Architecture Review Board | Added 14 new stories (Guest Checkout x3, Refund, VAT, MFA, Low Stock x3, Order Status, Auto-Complete, VAT Report, Payment Recon, Image Upload); addressed REVIEW_REPORT.md RC-05..08 |
 
 ---
 
