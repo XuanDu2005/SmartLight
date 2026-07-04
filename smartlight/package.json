@@ -1,0 +1,40 @@
+{
+  "name": "smartlight",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SmartLight \u2014 Single Vendor E-Commerce Platform (Vietnam)",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "prisma:generate": "pnpm --filter @smartlight/api run prisma:generate",
+    "prisma:migrate": "pnpm --filter @smartlight/api run prisma:migrate",
+    "prisma:studio": "pnpm --filter @smartlight/api run prisma:studio",
+    "prisma:seed": "pnpm --filter @smartlight/api run prisma:seed",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:rebuild": "docker compose up -d --build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.1.0",
+    "typescript": "^5.5.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

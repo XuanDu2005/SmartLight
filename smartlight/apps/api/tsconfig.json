@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@smartlight/shared": ["../../packages/shared/src/index.ts"],
+      "@smartlight/shared/*": ["../../packages/shared/src/*"],
+      "@smartlight/config": ["../../packages/config/src/index.ts"],
+      "@smartlight/config/*": ["../../packages/config/src/*"]
+    },
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo"
+  },
+  "include": ["src/**/*", "prisma/**/*.ts", "test/**/*"],
+  "exclude": ["node_modules", "dist", ".turbo", "coverage"]
+}

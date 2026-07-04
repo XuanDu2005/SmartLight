@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ERROR_CODES = void 0;
+/**
+ * Cross-module error codes referenced by both backend exceptions and frontend.
+ * Names match the values documented in `docs/04-api-design/06_ERROR_STANDARD.md`.
+ */
+exports.ERROR_CODES = Object.freeze({
+    VALIDATION_FAILED: 'VALIDATION_FAILED',
+    UNAUTHENTICATED: 'UNAUTHENTICATED',
+    INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+    FORBIDDEN: 'FORBIDDEN',
+    NOT_FOUND: 'NOT_FOUND',
+    CONFLICT: 'CONFLICT',
+    OUT_OF_STOCK: 'OUT_OF_STOCK',
+    COUPON_LIMIT_REACHED: 'COUPON_LIMIT_REACHED',
+    COUPON_EXPIRED: 'COUPON_EXPIRED',
+    CART_EMPTY: 'CART_EMPTY',
+    CHECKOUT_EXPIRED: 'CHECKOUT_EXPIRED',
+    IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+    IDEMPOTENCY_IN_PROGRESS: 'IDEMPOTENCY_IN_PROGRESS',
+    PAYMENT_FAILED: 'PAYMENT_FAILED',
+    PAYMENT_PROVIDER_ERROR: 'PAYMENT_PROVIDER_ERROR',
+    RATE_LIMITED: 'RATE_LIMITED',
+    INTERNAL: 'INTERNAL',
+});

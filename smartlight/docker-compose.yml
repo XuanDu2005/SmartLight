@@ -1,0 +1,91 @@
+name: smartlight
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartlight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smartlight
+      POSTGRES_PASSWORD: smartlight_dev_password
+      POSTGRES_DB: smartlight
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartlight -d smartlight"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartlight-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: smartlight-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: info
+      API_PORT: 4000
+      API_BASE_URL: http://api:4000
+      API_CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      DATABASE_URL: postgresql://smartlight:smartlight_dev_password@postgres:5432/smartlight?schema=public
+      DIRECT_URL: postgresql://smartlight:smartlight_dev_password@postgres:5432/smartlight?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: change_me_min_32_characters_long_secret_dev
+      JWT_REFRESH_SECRET: change_me_another_min_32_characters_long_secret_dev
+      JWT_ACCESS_TTL_SEC: 900
+      JWT_REFRESH_TTL_SEC: 604800
+      JWT_REMEMBER_ME_TTL_SEC: 2592000
+      THROTTLE_TTL_SEC: 60
+      THROTTLE_LIMIT: 20
+      FRONTEND_BASE_URL: http://localhost:5173
+      ADMIN_BASE_URL: http://localhost:5174
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./apps/api/src:/app/apps/api/src:ro
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: smartlight-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: smartlight-admin
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5174:5174"
+
+volumes:
+  postgres-data:
+    driver: local

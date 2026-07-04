@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.tsbuildinfo
+.git
+.gitignore
+.env
+.env.local
+docs
+.vscode
+.idea
+**/*.log
+coverage
+**/.DS_Store
