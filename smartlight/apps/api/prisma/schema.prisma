@@ -121,6 +121,9 @@ model User {
   refreshTokens            RefreshToken[]
   sessions                 UserSession[]
 
+  // Cart
+  carts                    Cart[]
+
   @@unique([provider, providerId])
   @@index([email])
   @@index([status])
@@ -462,6 +465,7 @@ model ProductVariant {
   product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   inventory Inventory?
   images    ProductImage[]
+  cartItems CartItem[]
 
   @@index([productId, status, displayOrder])
   @@index([sku])
@@ -600,6 +604,110 @@ model AuditLog {
   @@index([actorAdminId, createdAt(sort: Desc)])
   @@index([entityType, entityId, createdAt(sort: Desc)])
   @@map("audit_log")
+}
+
+// =============================================================================
+//  CART & COUPON (cart-phase bounded context)
+// =============================================================================
+
+enum CartStatus {
+  ACTIVE
+  ABANDONED
+  CHECKED_OUT
+  EXPIRED
+}
+
+enum CouponDiscountType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id              String            @id @default(cuid())
+  code            String            @unique @db.VarChar(40)
+  description     String?           @db.Text
+  discountType    CouponDiscountType @map("discount_type")
+  discountValue   Decimal           @map("discount_value") @db.Decimal(12, 4)
+  minCartTotal    Decimal           @default(0) @map("min_cart_total") @db.Decimal(20, 4)
+  usageLimit      Int?              @map("usage_limit")
+  usageCount      Int               @default(0) @map("usage_count")
+  perUserLimit    Int?              @map("per_user_limit")
+  validFrom       DateTime?         @map("valid_from") @db.Timestamptz(6)
+  validUntil      DateTime?         @map("valid_until") @db.Timestamptz(6)
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  carts           Cart[]
+
+  @@map("coupon")
+}
+
+model Cart {
+  id                 String      @id @default(cuid())
+  userId             String      @map("user_id")
+  status             CartStatus  @default(ACTIVE)
+  couponId           String?     @map("coupon_id")
+  couponCode         String?     @map("coupon_code") @db.VarChar(40)
+  currency           String      @default("VND") @db.VarChar(3)
+  subtotal           Decimal     @default(0) @db.Decimal(20, 4)
+  discountTotal      Decimal     @default(0) @map("discount_total") @db.Decimal(20, 4)
+  taxTotal           Decimal     @default(0) @map("tax_total") @db.Decimal(20, 4)
+  shippingTotal      Decimal     @default(0) @map("shipping_total") @db.Decimal(20, 4)
+  estimatedShipping  Decimal     @default(0) @map("estimated_shipping") @db.Decimal(20, 4)
+  grandTotal         Decimal     @default(0) @map("grand_total") @db.Decimal(20, 4)
+  itemCount          Int         @default(0) @map("item_count")
+  selectedItemCount  Int         @default(0) @map("selected_item_count")
+  isItemSelected     Boolean     @default(false) @map("is_item_selected")
+  notes              String?     @db.VarChar(500)
+  promotionSnapshot  Json        @default("{}") @map("promotion_snapshot") @db.JsonB
+  expiresAt          DateTime?   @map("expires_at") @db.Timestamptz(6)
+  lastActivityAt     DateTime    @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon             Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items              CartItem[]
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([lastActivityAt])
+  @@map("cart")
+}
+
+model CartItem {
+  id                    String        @id @default(cuid())
+  cartId                String        @map("cart_id")
+  productVariantId      String        @map("product_variant_id")
+  quantity              Int
+  unitPrice             Decimal       @map("unit_price") @db.Decimal(20, 4)
+  discountSnapshot      Decimal       @default(0) @map("discount_snapshot") @db.Decimal(20, 4)
+  subtotal              Decimal       @db.Decimal(20, 4)
+  productNameSnapshot   String        @map("product_name_snapshot") @db.VarChar(255)
+  variantNameSnapshot   String        @map("variant_name_snapshot") @db.VarChar(255)
+  skuSnapshot           String        @map("sku_snapshot") @db.VarChar(64)
+  productSlug           String        @map("product_slug") @db.VarChar(160)
+  productImageUrl       String?       @map("product_image_url") @db.VarChar(500)
+  color                 String?       @db.VarChar(60)
+  size                  String?       @db.VarChar(60)
+  isSelected            Boolean       @default(true) @map("is_selected")
+  availableStockAtAdd   Int?          @map("available_stock_at_add")
+  notes                 String?       @db.VarChar(500)
+  promotionSnapshot     Json          @default("{}") @map("promotion_snapshot") @db.JsonB
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  cart                  Cart          @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant               ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, productVariantId])
+  @@index([productVariantId])
+  @@index([deletedAt])
+  @@map("cart_item")
 }
 
 // =============================================================================
