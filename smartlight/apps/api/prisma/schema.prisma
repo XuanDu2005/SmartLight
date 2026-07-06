@@ -299,8 +299,283 @@ model UserSession {
 }
 
 // =============================================================================
-//  AUDIT (minimal)
+//  CATALOG ENUMS
 // =============================================================================
+
+enum CategoryStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum BrandStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+}
+
+enum ProductVariantStatus {
+  ACTIVE
+  OUT_OF_STOCK
+  DISCONTINUED
+}
+
+enum AttributeDataType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  COLOR_HEX
+  LIST
+}
+
+enum MediaPurpose {
+  PRODUCT_IMAGE
+  PRODUCT_GALLERY
+  CATEGORY_BANNER
+  BRAND_LOGO
+  REVIEW_ATTACHMENT
+  AVATAR
+  STATIC_PAGE
+  SUPPORT_ATTACHMENT
+  EMAIL_ASSET
+}
+
+// =============================================================================
+//  CATALOG MODELS
+// =============================================================================
+
+model Category {
+  id           String         @id @default(cuid())
+  parentId     String?        @map("parent_id")
+  slug         String         @unique @db.VarChar(120)
+  name         String         @db.VarChar(160)
+  description  String?        @db.Text
+  imageMediaId String?        @map("image_media_id")
+  displayOrder Int            @default(0) @map("display_order")
+  level        Int            @default(0)
+  path         String         @default("/") @db.VarChar(500)
+  status       CategoryStatus @default(DRAFT)
+  isFeatured   Boolean        @default(false) @map("is_featured")
+  taxExempt    Boolean        @default(false) @map("tax_exempt")
+  metaTitle    String?        @map("meta_title") @db.VarChar(255)
+  metaDesc     String?        @map("meta_description") @db.VarChar(500)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  parent     Category?       @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children   Category[]      @relation("CategoryTree")
+  products   Product[]
+
+  @@index([parentId])
+  @@index([slug])
+  @@index([status, displayOrder])
+  @@index([deletedAt])
+  @@map("category")
+}
+
+model Brand {
+  id           String      @id @default(cuid())
+  slug         String      @unique @db.VarChar(120)
+  name         String      @db.VarChar(160)
+  description  String?     @db.Text
+  logoMediaId  String?     @map("logo_media_id")
+  isFeatured   Boolean     @default(false) @map("is_featured")
+  status       BrandStatus @default(ACTIVE)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  products   Product[]
+
+  @@index([status])
+  @@index([slug])
+  @@map("brand")
+}
+
+model Product {
+  id            String        @id @default(cuid())
+  slug          String        @unique @db.VarChar(160)
+  name          String        @db.VarChar(255)
+  shortDesc     String?       @map("short_description") @db.VarChar(500)
+  description   String?       @db.Text
+  categoryId    String        @map("category_id")
+  brandId       String?       @map("brand_id")
+  basePrice     Decimal       @map("base_price") @db.Decimal(20, 4)
+  compareAtPrice Decimal?     @map("compare_at_price") @db.Decimal(20, 4)
+  status        ProductStatus @default(DRAFT)
+  isFeatured    Boolean       @default(false) @map("is_featured")
+  isNewArrival  Boolean       @default(false) @map("is_new_arrival")
+  publishedAt   DateTime?     @map("published_at") @db.Timestamptz(6)
+  viewCount     BigInt        @default(0) @map("view_count")
+  ratingAvg     Decimal       @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount   Int           @default(0) @map("rating_count")
+  tags          String[]      @default([])
+  metaTitle     String?       @map("meta_title") @db.VarChar(255)
+  metaDesc     String?       @map("meta_description") @db.VarChar(500)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  category    Category              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand       Brand?                @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  variants    ProductVariant[]
+  images      ProductImage[]
+  attributes  ProductAttributeValue[]
+
+  @@index([categoryId, status, publishedAt(sort: Desc)])
+  @@index([brandId, status])
+  @@index([slug])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([isFeatured, status])
+  @@index([deletedAt])
+  @@map("product")
+}
+
+model ProductVariant {
+  id             String               @id @default(cuid())
+  productId      String               @map("product_id")
+  sku            String               @unique @db.VarChar(64)
+  barcode        String?              @db.VarChar(64)
+  name           String               @db.VarChar(255)
+  price          Decimal              @db.Decimal(20, 4)
+  compareAtPrice Decimal?             @map("compare_at_price") @db.Decimal(20, 4)
+  cost           Decimal?             @db.Decimal(20, 4)
+  weightGrams    Int?                 @map("weight_grams")
+  lengthMm       Int?                 @map("length_mm")
+  widthMm        Int?                 @map("width_mm")
+  heightMm       Int?                 @map("height_mm")
+  status         ProductVariantStatus @default(ACTIVE)
+  isDefault      Boolean              @default(false) @map("is_default")
+  displayOrder   Int                  @default(0) @map("display_order")
+  attributesJson Json                 @default("{}") @map("attributes_json") @db.JsonB
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?            @map("deleted_at") @db.Timestamptz(6)
+
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory Inventory?
+  images    ProductImage[]
+
+  @@index([productId, status, displayOrder])
+  @@index([sku])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("product_variant")
+}
+
+model ProductImage {
+  id             String          @id @default(cuid())
+  productId      String          @map("product_id")
+  variantId      String?         @map("variant_id")
+  mediaId        String          @map("media_id")
+  altText        String?         @map("alt_text") @db.VarChar(255)
+  displayOrder   Int             @default(0) @map("display_order")
+  isPrimary      Boolean         @default(false) @map("is_primary")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  media   MediaFile      @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@index([productId, displayOrder])
+  @@index([variantId])
+  @@map("product_image")
+}
+
+model ProductAttribute {
+  id           String           @id @default(cuid())
+  code         String           @unique @db.VarChar(60)
+  displayName String           @map("display_name") @db.VarChar(120)
+  dataType    AttributeDataType @default(TEXT) @map("data_type")
+  unit        String?           @db.VarChar(20)
+  isFilterable Boolean          @default(true) @map("is_filterable")
+  isRequired   Boolean           @default(false) @map("is_required")
+  sortOrder   Int               @default(0) @map("sort_order")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  values ProductAttributeValue[]
+
+  @@map("product_attribute")
+}
+
+model ProductAttributeValue {
+  id             String           @id @default(cuid())
+  productId      String           @map("product_id")
+  attributeId    String           @map("attribute_id")
+  valueText      String?          @map("value_text") @db.VarChar(255)
+  valueNumber    Decimal?         @map("value_number") @db.Decimal(20, 4)
+  valueBoolean   Boolean?         @map("value_boolean")
+  valueColorHex  String?          @map("value_color_hex") @db.VarChar(7)
+  valueListValue String?         @map("value_list_value") @db.VarChar(120)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product   Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute ProductAttribute   @relation(fields: [attributeId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, attributeId])
+  @@index([attributeId])
+  @@map("product_attribute_value")
+}
+
+model MediaFile {
+  id               String        @id @default(cuid())
+  provider         String        @default("cloudinary") @db.VarChar(40)
+  providerAssetId  String        @map("provider_asset_id") @db.VarChar(255)
+  url              String        @db.Text
+  secureUrl        String        @map("secure_url") @db.Text
+  mimeType         String        @map("mime_type") @db.VarChar(60)
+  sizeBytes        BigInt        @map("size_bytes")
+  width            Int?
+  height           Int?
+  durationSeconds  Int?          @map("duration_seconds")
+  purpose          MediaPurpose?
+  variantsJson     Json          @default("{}") @map("variants_json") @db.JsonB
+  checksum         String?       @db.VarChar(128)
+  ownerType        String?       @map("owner_type") @db.VarChar(40)
+  ownerId          String?       @map("owner_id")
+  createdById      String?       @map("created_by_id")
+  uploadedAt       DateTime      @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  deletedAt        DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  productImages ProductImage[]
+
+  @@index([provider, providerAssetId])
+  @@index([ownerType, ownerId])
+  @@index([purpose, deletedAt])
+  @@map("media_file")
+}
+
+model Inventory {
+  id                 String   @id @default(cuid())
+  productVariantId  String   @unique @map("product_variant_id")
+  warehouseCode      String   @default("MAIN") @map("warehouse_code") @db.VarChar(40)
+  onHand             Int      @default(0) @map("on_hand")
+  reserved           Int      @default(0)
+  available          Int      @default(0) @map("available")
+  lowStockThreshold  Int      @default(5) @map("low_stock_threshold")
+  allowBackorder     Boolean  @default(false) @map("allow_backorder")
+  lastCountedAt      DateTime? @map("last_counted_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  variant ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+
+  @@unique([productVariantId, warehouseCode])
+  @@index([available])
+  @@index([lowStockThreshold])
+  @@map("inventory")
+}
 
 model AuditLog {
   id           String              @id @default(cuid())
@@ -314,12 +589,19 @@ model AuditLog {
   requestId    String?             @map("request_id") @db.VarChar(64)
   ipAddress    String?             @map("ip_address") @db.VarChar(45)
   userAgent    String?             @map("user_agent") @db.VarChar(255)
+  beforeJson   Json?               @map("before_json") @db.JsonB
+  afterJson    Json?               @map("after_json") @db.JsonB
   metadataJson Json                @default("{}") @map("metadata_json") @db.JsonB
   createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  actorAdmin   AdminUser?          @relation("AuditActorAdmin", fields: [actorAdminId], references: [id], onDelete: SetNull)
+  actorAdmin AdminUser? @relation("AuditActorAdmin", fields: [actorAdminId], references: [id], onDelete: SetNull)
 
   @@index([category, createdAt(sort: Desc)])
   @@index([actorAdminId, createdAt(sort: Desc)])
+  @@index([entityType, entityId, createdAt(sort: Desc)])
   @@map("audit_log")
 }
+
+// =============================================================================
+//  END OF CATALOG
+// =============================================================================
