@@ -1,0 +1,43 @@
+/**
+ * Checkout domain constants.
+ *
+ * Business rules encoded here so they are easy to find and modify.
+ */
+export const CHECKOUT_LIMITS = {
+  /** How long a checkout session lives before auto-expiry (minutes). */
+  SESSION_TTL_MINUTES: 15,
+  /** How long a stock reservation lives before auto-release (minutes). */
+  RESERVATION_TTL_MINUTES: 15,
+  /** Default currency. */
+  DEFAULT_CURRENCY: 'VND',
+  /** Vietnam phone regex (0-prefixed, 10-11 digits). */
+  PHONE_REGEX: /^0\d{9,10}$/,
+  /** Minimum address detail length. */
+  MIN_ADDRESS_DETAIL_LENGTH: 5,
+  /** Maximum address detail length. */
+  MAX_ADDRESS_DETAIL_LENGTH: 255,
+} as const;
+
+export const CHECKOUT_ERROR_CODES = {
+  CHECKOUT_NOT_FOUND: 'CHECKOUT_NOT_FOUND',
+  CHECKOUT_EXPIRED: 'CHECKOUT_EXPIRED',
+  CHECKOUT_CANCELLED: 'CHECKOUT_CANCELLED',
+  CHECKOUT_COMPLETED: 'CHECKOUT_COMPLETED',
+  CHECKOUT_INVALID_STATUS: 'CHECKOUT_INVALID_STATUS',
+  EMPTY_CART: 'EMPTY_CART',
+  NO_SELECTED_ITEMS: 'NO_SELECTED_ITEMS',
+  PRODUCT_UNAVAILABLE: 'PRODUCT_UNAVAILABLE',
+  VARIANT_UNAVAILABLE: 'VARIANT_UNAVAILABLE',
+  INSUFFICIENT_STOCK: 'INSUFFICIENT_STOCK',
+  RESERVATION_FAILED: 'RESERVATION_FAILED',
+  RESERVATION_EXPIRED: 'RESERVATION_EXPIRED',
+  INVALID_ADDRESS: 'INVALID_ADDRESS',
+  INVALID_PHONE: 'INVALID_PHONE',
+  CART_NOT_FOUND: 'CART_NOT_FOUND',
+  CART_ALREADY_CONVERTED: 'CART_ALREADY_CONVERTED',
+  UNAUTHORIZED_ACCESS: 'UNAUTHORIZED_ACCESS',
+  IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_CONFLICT',
+} as const;
+
+export type CheckoutErrorCode =
+  (typeof CHECKOUT_ERROR_CODES)[keyof typeof CHECKOUT_ERROR_CODES];

@@ -466,6 +466,8 @@ model ProductVariant {
   inventory Inventory?
   images    ProductImage[]
   cartItems CartItem[]
+  checkoutItems CheckoutItem[]
+  reservationItems ReservationItem[]
 
   @@index([productId, status, displayOrder])
   @@index([sku])
@@ -671,6 +673,8 @@ model Cart {
   user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   coupon             Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
   items              CartItem[]
+  checkoutSessions   CheckoutSession[]
+  reservations       StockReservation[]
 
   @@index([userId, status])
   @@index([status, expiresAt])
@@ -708,6 +712,148 @@ model CartItem {
   @@index([productVariantId])
   @@index([deletedAt])
   @@map("cart_item")
+}
+
+// =============================================================================
+//  CHECKOUT (checkout-phase bounded context)
+// =============================================================================
+
+enum CheckoutSessionStatus {
+  CREATED
+  PENDING_RESERVATION
+  RESERVED
+  EXPIRED
+  CANCELLED
+  COMPLETED
+}
+
+enum StockReservationStatus {
+  ACTIVE
+  RELEASED
+  CONFIRMED
+  EXPIRED
+}
+
+model StockReservation {
+  id                 String                  @id @default(cuid())
+  checkoutSessionId  String?                @unique @map("checkout_session_id")
+  cartId             String?               @map("cart_id")
+  userId             String?               @map("user_id")
+  status             StockReservationStatus @default(ACTIVE)
+  expiresAt          DateTime              @map("expires_at") @db.Timestamptz(6)
+  consumedAt         DateTime?             @map("consumed_at") @db.Timestamptz(6)
+  releasedAt         DateTime?             @map("released_at") @db.Timestamptz(6)
+  releasedReason     String?               @map("released_reason") @db.VarChar(80)
+  metadataJson       Json                  @default("{}") @map("metadata_json") @db.JsonB
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  session            CheckoutSession?      @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+  cart               Cart?                @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  items              ReservationItem[]
+
+  @@index([checkoutSessionId])
+  @@index([cartId])
+  @@index([userId])
+  @@index([status, expiresAt])
+  @@map("stock_reservation")
+}
+
+model ReservationItem {
+  id                 String            @id @default(cuid())
+  reservationId     String            @map("reservation_id")
+  productVariantId  String            @map("product_variant_id")
+  quantity           Int
+  reservedAt        DateTime          @default(now()) @map("reserved_at") @db.Timestamptz(6)
+
+  reservation       StockReservation  @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  variant           ProductVariant    @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, productVariantId])
+  @@index([productVariantId])
+  @@map("reservation_item")
+}
+
+model CheckoutSession {
+  id                    String                  @id @default(cuid())
+  cartId               String                  @map("cart_id")
+  userId               String                  @map("user_id")
+  status               CheckoutSessionStatus   @default(CREATED)
+
+  // Shipping address (denormalised for snapshot isolation)
+  shippingFullName    String?                 @map("shipping_full_name") @db.VarChar(120)
+  shippingPhone        String?                 @map("shipping_phone") @db.VarChar(20)
+  shippingProvince     String?                 @map("shipping_province") @db.VarChar(80)
+  shippingDistrict     String?                 @map("shipping_district") @db.VarChar(80)
+  shippingWard         String?                 @map("shipping_ward") @db.VarChar(80)
+  shippingDetail      String?                 @map("shipping_detail") @db.VarChar(255)
+
+  // Billing address (optional, defaults to shipping)
+  billingFullName     String?                 @map("billing_full_name") @db.VarChar(120)
+  billingPhone        String?                 @map("billing_phone") @db.VarChar(20)
+  billingProvince     String?                 @map("billing_province") @db.VarChar(80)
+  billingDistrict     String?                 @map("billing_district") @db.VarChar(80)
+  billingWard         String?                 @map("billing_ward") @db.VarChar(80)
+  billingDetail       String?                 @map("billing_detail") @db.VarChar(255)
+
+  // Totals
+  currency             String                  @default("VND") @db.VarChar(3)
+  subtotal             Decimal                 @default(0) @db.Decimal(20, 4)
+  discountAmount       Decimal                 @default(0) @map("discount_amount") @db.Decimal(20, 4)
+  shippingFee          Decimal                 @default(0) @map("shipping_fee") @db.Decimal(20, 4)
+  taxAmount            Decimal                 @default(0) @map("tax_amount") @db.Decimal(20, 4)
+  grandTotal           Decimal                 @default(0) @map("grand_total") @db.Decimal(20, 4)
+
+  // Shipping method placeholder
+  shippingMethodId    String?                 @map("shipping_method_id")
+  shippingMethodName  String?                 @map("shipping_method_name") @db.VarChar(120)
+
+  // Coupon placeholder
+  couponId            String?                 @map("coupon_id")
+  couponCode          String?                 @map("coupon_code") @db.VarChar(40)
+
+  // Idempotency
+  idempotencyKey      String?                 @unique @map("idempotency_key") @db.VarChar(120)
+
+  expiresAt            DateTime                @map("expires_at") @db.Timestamptz(6)
+  completedAt          DateTime?               @map("completed_at") @db.Timestamptz(6)
+  cancelledAt          DateTime?               @map("cancelled_at") @db.Timestamptz(6)
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  cart                 Cart                  @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  reservation          StockReservation?
+  items                CheckoutItem[]
+
+  @@index([userId, status])
+  @@index([cartId])
+  @@index([status, expiresAt])
+  @@map("checkout_session")
+}
+
+model CheckoutItem {
+  id                     String        @id @default(cuid())
+  sessionId             String        @map("session_id")
+  productVariantId       String        @map("product_variant_id")
+  quantity               Int
+  // Price snapshots (immutable once checkout starts)
+  unitPriceSnapshot      Decimal       @map("unit_price") @db.Decimal(20, 4)
+  lineSubtotalSnapshot   Decimal       @map("line_subtotal") @db.Decimal(20, 4)
+  taxAmountSnapshot      Decimal       @default(0) @map("tax_amount_snapshot") @db.Decimal(20, 4)
+  productNameSnapshot    String        @map("product_name_snapshot") @db.VarChar(255)
+  variantNameSnapshot    String        @map("variant_name_snapshot") @db.VarChar(255)
+  skuSnapshot            String        @map("sku_snapshot") @db.VarChar(64)
+  productSlug            String        @map("product_slug") @db.VarChar(160)
+  productImageUrl        String?       @map("product_image_url") @db.VarChar(500)
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  session               CheckoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  variant               ProductVariant  @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, productVariantId])
+  @@index([productVariantId])
+  @@map("checkout_item")
 }
 
 // =============================================================================
