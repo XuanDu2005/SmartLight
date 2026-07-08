@@ -127,6 +127,7 @@ model User {
   // Orders
   orders                   Order[]
   shipments                Shipment[]
+  voucherUsages            VoucherUsage[]
 
   @@unique([provider, providerId])
   @@index([email])
@@ -379,6 +380,7 @@ model Category {
   parent     Category?       @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children   Category[]      @relation("CategoryTree")
   products   Product[]
+  promotionTargets PromotionCategory[]
 
   @@index([parentId])
   @@index([slug])
@@ -400,6 +402,7 @@ model Brand {
   deletedAt    DateTime?   @map("deleted_at") @db.Timestamptz(6)
 
   products   Product[]
+  promotionTargets PromotionBrand[]
 
   @@index([status])
   @@index([slug])
@@ -476,6 +479,7 @@ model ProductVariant {
   stockMovements StockMovement[]
   adjustments InventoryAdjustment[]
   shipmentItems ShipmentItem[]
+  promotionTargets PromotionProduct[]
 
   @@index([productId, status, displayOrder])
   @@index([sku])
@@ -949,6 +953,7 @@ model Order {
   statusHistory       OrderStatusHistory[]
   payments            Payment[]
   shipments           Shipment[]
+  voucherUsages       VoucherUsage[]
 
   @@index([orderNumber])
   @@index([userId, status])
@@ -1348,6 +1353,186 @@ model ShippingFeeCache {
   @@unique([provider, originProvince, originDistrict, destProvince, destDistrict, weightGrams])
   @@index([expiresAt])
   @@map("shipping_fee_cache")
+}
+
+// =============================================================================
+//  PROMOTIONS
+// =============================================================================
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+  FLASH_SALE
+}
+
+enum PromotionStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  EXPIRED
+  DISABLED
+  ARCHIVED
+}
+
+enum VoucherType {
+  PUBLIC
+  PRIVATE
+  AUTO_APPLY
+}
+
+enum DiscountScope {
+  ORDER
+  PRODUCT
+  CATEGORY
+  BRAND
+}
+
+enum UsageLimitType {
+  UNLIMITED
+  PER_USER
+  TOTAL
+}
+
+model Promotion {
+  id                  String            @id @default(cuid())
+  name                String            @db.VarChar(120)
+  description         String?           @db.VarChar(1000)
+  type                PromotionType
+  status              PromotionStatus   @default(DRAFT)
+  scope               DiscountScope     @default(ORDER)
+  discountValue       Decimal           @map("discount_value") @db.Decimal(20, 4)
+  minimumOrderValue   Decimal           @default(0) @map("minimum_order_value") @db.Decimal(20, 4)
+  maximumDiscount     Decimal?          @map("maximum_discount") @db.Decimal(20, 4)
+  startAt             DateTime          @map("start_at") @db.Timestamptz(6)
+  endAt               DateTime          @map("end_at") @db.Timestamptz(6)
+  priority            Int               @default(0)
+  stackable           Boolean           @default(false)
+  usageLimitType      UsageLimitType    @default(TOTAL) @map("usage_limit_type")
+  usageLimit          Int?              @map("usage_limit")
+  perUserLimit        Int?              @map("per_user_limit")
+  usedCount           Int               @default(0) @map("used_count")
+  isFreeShipping      Boolean           @default(false) @map("is_free_shipping")
+  flashSaleStock      Int?              @map("flash_sale_stock")
+  flashSaleSold       Int               @default(0) @map("flash_sale_sold")
+  bannerMediaUrl      String?           @map("banner_media_url") @db.VarChar(1024)
+  metadataJson        Json              @default("{}") @map("metadata_json") @db.JsonB
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt          DateTime?         @map("archived_at") @db.Timestamptz(6)
+
+  vouchers            Voucher[]
+  productTargets      PromotionProduct[]
+  categoryTargets     PromotionCategory[]
+  brandTargets        PromotionBrand[]
+  auditLogs           PromotionAuditLog[]
+
+  @@index([status, startAt])
+  @@index([status, endAt])
+  @@index([type, status])
+  @@index([priority])
+  @@index([createdAt(sort: Desc)])
+  @@map("promotion")
+}
+
+model PromotionProduct {
+  id                String         @id @default(cuid())
+  promotionId       String         @map("promotion_id")
+  productVariantId  String         @map("product_variant_id")
+
+  promotion         Promotion      @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  variant           ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, productVariantId])
+  @@index([productVariantId])
+  @@map("promotion_product")
+}
+
+model PromotionCategory {
+  id                String         @id @default(cuid())
+  promotionId       String         @map("promotion_id")
+  categoryId        String         @map("category_id")
+
+  promotion         Promotion      @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  category          Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, categoryId])
+  @@index([categoryId])
+  @@map("promotion_category")
+}
+
+model PromotionBrand {
+  id                String         @id @default(cuid())
+  promotionId       String         @map("promotion_id")
+  brandId           String         @map("brand_id")
+
+  promotion         Promotion      @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  brand             Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, brandId])
+  @@index([brandId])
+  @@map("promotion_brand")
+}
+
+model Voucher {
+  id                String         @id @default(cuid())
+  promotionId       String         @map("promotion_id")
+  code              String         @unique @db.VarChar(64)
+  type              VoucherType    @default(PUBLIC)
+  status            PromotionStatus @default(ACTIVE)
+  usageLimitType    UsageLimitType @default(TOTAL) @map("usage_limit_type")
+  usageLimit        Int?           @map("usage_limit")
+  perUserLimit      Int?           @map("per_user_limit")
+  usedCount         Int            @default(0) @map("used_count")
+  expiresAt         DateTime       @map("expires_at") @db.Timestamptz(6)
+  firstOrderOnly    Boolean        @default(false) @map("first_order_only")
+  metadataJson      Json           @default("{}") @map("metadata_json") @db.JsonB
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  promotion         Promotion      @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  usages            VoucherUsage[]
+
+  @@index([promotionId])
+  @@index([status, expiresAt])
+  @@map("voucher")
+}
+
+model VoucherUsage {
+  id                String         @id @default(cuid())
+  voucherId         String         @map("voucher_id")
+  userId            String         @map("user_id")
+  orderId           String         @map("order_id")
+  promotionId       String         @map("promotion_id")
+  discountAmount    Decimal        @map("discount_amount") @db.Decimal(20, 4)
+  usedAt            DateTime       @default(now()) @map("used_at") @db.Timestamptz(6)
+
+  voucher           Voucher        @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  user              User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  order             Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([voucherId, orderId])
+  @@index([userId])
+  @@index([orderId])
+  @@index([promotionId])
+  @@map("voucher_usage")
+}
+
+model PromotionAuditLog {
+  id                String         @id @default(cuid())
+  promotionId       String         @map("promotion_id")
+  action            String         @db.VarChar(60)
+  payloadJson       Json           @map("payload_json") @db.JsonB
+  actorType         String         @default("ADMIN_USER") @map("actor_type") @db.VarChar(20)
+  actorId           String?        @map("actor_id")
+  actorName         String?        @map("actor_name") @db.VarChar(120)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  promotion         Promotion      @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@index([promotionId, createdAt(sort: Desc)])
+  @@index([action])
+  @@map("promotion_audit_log")
 }
 
 // =============================================================================

@@ -22,6 +22,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 import { ReviewModule } from './modules/review/review.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { MediaModule } from './modules/media/media.module';
@@ -66,6 +67,7 @@ import { GlobalExceptionFilter } from './platform/filters/global-exception.filte
     PaymentsModule,
     ShippingModule,
     PromotionModule,
+    PromotionsModule,
     ReviewModule,
     NotificationModule,
     MediaModule,
