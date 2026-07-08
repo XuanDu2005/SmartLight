@@ -472,6 +472,8 @@ model ProductVariant {
   checkoutItems CheckoutItem[]
   reservationItems ReservationItem[]
   orderItems OrderItem[]
+  stockMovements StockMovement[]
+  adjustments InventoryAdjustment[]
 
   @@index([productId, status, displayOrder])
   @@index([sku])
@@ -580,6 +582,8 @@ model Inventory {
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   variant ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  stockMovements  StockMovement[]
+  adjustments     InventoryAdjustment[]
 
   @@unique([productVariantId, warehouseCode])
   @@index([available])
@@ -1105,6 +1109,79 @@ model PaymentWebhookLog {
   @@index([status, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@map("payment_webhook_log")
+}
+
+// =============================================================================
+//  INVENTORY MANAGEMENT
+// =============================================================================
+
+enum StockMovementType {
+  IMPORT
+  EXPORT
+  SALE
+  RESERVATION
+  RELEASE
+  RETURN
+  ADJUSTMENT
+}
+
+enum InventoryAdjustmentReason {
+  COUNT_CORRECTION
+  DAMAGE
+  LOSS
+  RECEIVING
+  TRANSFER
+  INITIAL_STOCK
+  OTHER
+}
+
+model StockMovement {
+  id                String             @id @default(cuid())
+  inventoryId       String             @map("inventory_id")
+  productVariantId  String             @map("product_variant_id")
+  type              StockMovementType
+  quantity          Int                // signed: positive = in, negative = out
+  onHandAfter       Int                @map("on_hand_after")
+  reservedAfter     Int                @map("reserved_after") @default(0)
+  reason            String?            @db.VarChar(255)
+  referenceType     String?            @map("reference_type") @db.VarChar(60)
+  referenceId       String?            @map("reference_id")
+  createdByType     ActorType          @default(SYSTEM) @map("created_by_type")
+  createdById       String?            @map("created_by_id")
+  metadataJson      Json               @default("{}") @map("metadata_json") @db.JsonB
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  inventory         Inventory           @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  variant           ProductVariant      @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([inventoryId, createdAt(sort: Desc)])
+  @@index([productVariantId, createdAt(sort: Desc)])
+  @@index([type])
+  @@index([referenceType, referenceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("stock_movement")
+}
+
+model InventoryAdjustment {
+  id                String                      @id @default(cuid())
+  inventoryId       String                      @map("inventory_id")
+  productVariantId  String                      @map("product_variant_id")
+  quantityDelta     Int                         @map("quantity_delta")
+  onHandAfter      Int                         @map("on_hand_after")
+  reason            InventoryAdjustmentReason
+  note              String?                     @db.Text
+  referenceType     String?                     @map("reference_type") @db.VarChar(60)
+  referenceId       String?                     @map("reference_id")
+  createdByType     ActorType                   @default(ADMIN_USER) @map("created_by_type")
+  createdById       String?                     @map("created_by_id")
+  createdAt         DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  inventory         Inventory                   @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  variant           ProductVariant              @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([inventoryId, createdAt(sort: Desc)])
+  @@index([productVariantId, createdAt(sort: Desc)])
+  @@map("inventory_adjustment")
 }
 
 // =============================================================================
