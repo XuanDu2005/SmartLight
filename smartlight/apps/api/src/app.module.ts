@@ -18,8 +18,8 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { CartModule } from './modules/cart/cart.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
-import { OrderModule } from './modules/order/order.module';
-import { PaymentModule } from './modules/payment/payment.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
 import { PromotionModule } from './modules/promotion/promotion.module';
 import { ReviewModule } from './modules/review/review.module';
@@ -62,8 +62,8 @@ import { GlobalExceptionFilter } from './platform/filters/global-exception.filte
     InventoryModule,
     CartModule,
     CheckoutModule,
-    OrderModule,
-    PaymentModule,
+    OrdersModule,
+    PaymentsModule,
     ShippingModule,
     PromotionModule,
     ReviewModule,
