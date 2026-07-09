@@ -9,9 +9,10 @@ import { LoggerModule } from 'nestjs-pino';
 
 import { HealthModule } from './platform/health/health.module';
 import { DatabaseModule } from './platform/database/database.module';
+import { RedisModule } from './platform/redis/redis.module';
+import { QueueModule } from './platform/queue/queue.module';
 import { LoggerConfig } from './platform/logger/logger.config';
 
-import { IdentityModule } from './modules/identity/identity.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
@@ -21,7 +22,6 @@ import { CheckoutModule } from './modules/checkout/checkout.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
-import { PromotionModule } from './modules/promotion/promotion.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
 import { ReviewModule } from './modules/review/review.module';
 import { NotificationModule } from './modules/notification/notification.module';
@@ -54,9 +54,10 @@ import { GlobalExceptionFilter } from './platform/filters/global-exception.filte
     // Platform
     HealthModule,
     DatabaseModule,
+    RedisModule,
+    QueueModule,
 
     // Bounded contexts
-    IdentityModule,
     AuthModule,
     UsersModule,
     CatalogModule,
@@ -66,7 +67,6 @@ import { GlobalExceptionFilter } from './platform/filters/global-exception.filte
     OrdersModule,
     PaymentsModule,
     ShippingModule,
-    PromotionModule,
     PromotionsModule,
     ReviewModule,
     NotificationModule,

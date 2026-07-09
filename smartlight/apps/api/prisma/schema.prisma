@@ -1536,5 +1536,93 @@ model PromotionAuditLog {
 }
 
 // =============================================================================
+//  NOTIFICATIONS
+// =============================================================================
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum NotificationEventType {
+  USER_REGISTERED
+  USER_VERIFIED
+  PASSWORD_RESET
+  ORDER_CREATED
+  ORDER_PAID
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  PAYMENT_FAILED
+  SHIPMENT_RETURNED
+  PROMOTION_PUBLISHED
+  LOW_STOCK_ALERT
+  ADMIN_GENERIC
+  CUSTOM
+}
+
+model NotificationTemplate {
+  id              String              @id @default(cuid())
+  code            String              @unique @db.VarChar(80)
+  eventType       NotificationEventType @map("event_type")
+  channel         NotificationChannel
+  locale          String              @default("vi-VN") @db.VarChar(10)
+  subjectTemplate String?             @map("subject_template") @db.VarChar(255)
+  bodyTemplate    String              @map("body_template") @db.Text
+  variablesJson   Json                @default("[]") @map("variables_json") @db.JsonB
+  isActive        Boolean             @default(true) @map("is_active")
+  version         Int                 @default(1)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?           @map("deleted_at") @db.Timestamptz(6)
+
+  notifications Notification[]
+
+  @@unique([code, channel, locale])
+  @@index([eventType, channel, isActive])
+  @@map("notification_template")
+}
+
+model Notification {
+  id              String                @id @default(cuid())
+  templateId      String?               @map("template_id")
+  eventType       NotificationEventType @map("event_type")
+  channel         NotificationChannel
+  recipientUserId String?               @map("recipient_user_id")
+  recipientEmail  String?               @map("recipient_email") @db.VarChar(255)
+  recipientPhone  String?               @map("recipient_phone") @db.VarChar(30)
+  subject         String?               @db.VarChar(255)
+  body            String                @db.Text
+  variablesJson   Json                  @default("{}") @map("variables_json") @db.JsonB
+  status          NotificationStatus    @default(QUEUED)
+  attempts        Int                   @default(0)
+  lastError       String?               @map("last_error") @db.Text
+  providerMessageId String?             @map("provider_message_id") @db.VarChar(160)
+  queuedAt        DateTime              @default(now()) @map("queued_at") @db.Timestamptz(6)
+  sentAt          DateTime?             @map("sent_at") @db.Timestamptz(6)
+  nextAttemptAt   DateTime?             @map("next_attempt_at") @db.Timestamptz(6)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  template NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status, queuedAt])
+  @@index([eventType, status])
+  @@index([recipientUserId])
+  @@index([recipientEmail])
+  @@map("notification")
+}
+
+// =============================================================================
 //  END OF CATALOG
 // =============================================================================
