@@ -1,6 +1,11 @@
+import { EmptyState } from '@smartlight/ui';
+
 export const UsersPage = (): JSX.Element => (
-  <section className="p-6">
-    <h1 className="text-2xl font-bold">Ng\u01b0\u1eddi d\u00f9ng</h1>
-    <p className="mt-2 text-neutral-600">Qu\u1ea3n l\u00fd ng\u01b0\u1eddi d\u00f9ng.</p>
+  <section className="container-page py-6">
+    <h1 className="mb-4 text-2xl font-semibold text-neutral-900">Người dùng</h1>
+    <EmptyState
+      title="Sắp ra mắt"
+      description="Trang quản lý người dùng sẽ kết nối với /v1/admin/users/* ở giai đoạn tiếp theo."
+    />
   </section>
 );

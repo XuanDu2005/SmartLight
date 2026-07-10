@@ -1,8 +1,29 @@
+import { Badge, Card, CardHeader, CardTitle } from '@smartlight/ui';
+
 export const DashboardPage = (): JSX.Element => (
-  <section className="p-6">
-    <h1 className="text-2xl font-bold">T\u1ed5ng quan</h1>
-    <p className="mt-2 text-neutral-600">
-      Dashboard \u0111i\u1ec1u khi\u1ec3n s\u1ebd hi\u1ec3n th\u1ecb \u1edf \u0111\u00e2y.
-    </p>
+  <section className="container-page py-6">
+    <div className="mb-6 flex items-center gap-2">
+      <h1 className="text-2xl font-semibold text-neutral-900">Tổng quan</h1>
+      <Badge variant="info">v0.1.0</Badge>
+    </div>
+
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {[
+        { label: 'Doanh thu hôm nay', value: '—', hint: 'API chưa wire' },
+        { label: 'Đơn hàng mới', value: '—', hint: 'API chưa wire' },
+        { label: 'Khách hàng mới', value: '—', hint: 'API chưa wire' },
+        { label: 'Sản phẩm sắp hết', value: '—', hint: 'API chưa wire' },
+      ].map((k) => (
+        <Card key={k.label}>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-neutral-500">
+              {k.label}
+            </CardTitle>
+          </CardHeader>
+          <div className="text-3xl font-semibold text-neutral-900">{k.value}</div>
+          <p className="mt-1 text-xs text-neutral-400">{k.hint}</p>
+        </Card>
+      ))}
+    </div>
   </section>
 );

@@ -1,6 +1,11 @@
+import { EmptyState } from '@smartlight/ui';
+
 export const ProductsPage = (): JSX.Element => (
-  <section className="p-6">
-    <h1 className="text-2xl font-bold">S\u1ea3n ph\u1ea9m</h1>
-    <p className="mt-2 text-neutral-600">Qu\u1ea3n l\u00fd catalog.</p>
+  <section className="container-page py-6">
+    <h1 className="mb-4 text-2xl font-semibold text-neutral-900">Sản phẩm</h1>
+    <EmptyState
+      title="Sắp ra mắt"
+      description="Trang quản lý catalog sẽ kết nối với /v1/admin/catalog/* ở giai đoạn tiếp theo."
+    />
   </section>
 );

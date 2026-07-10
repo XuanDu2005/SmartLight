@@ -24,6 +24,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PaymentProvider } from '@prisma/client';
 
 import { PaymentsService } from './service';
@@ -31,6 +32,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
 import type { AuthenticatedRequest } from '../users/interfaces/user-principal.interface';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import type {
   AdminListPaymentsQueryDto,
@@ -45,6 +47,7 @@ import type {
   PaymentSummaryDto,
 } from './dto/payment-response.dto';
 
+@ApiTags('Payments')
 @Controller()
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
@@ -59,6 +62,8 @@ export class PaymentsController {
    */
   @Post('payments')
   @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Create a payment intent for an order' })
   async create(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: CreatePaymentDto,
@@ -70,6 +75,8 @@ export class PaymentsController {
    * GET /payments/:id
    */
   @Get('payments/:id')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Get a payment by id' })
   async getOne(
     @CurrentUser() user: UserPrincipal,
     @Param('id') paymentId: string,
@@ -82,6 +89,8 @@ export class PaymentsController {
    */
   @Post('payments/:id/retry')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Retry a failed payment' })
   async retry(
     @CurrentUser() user: UserPrincipal,
     @Param('id') paymentId: string,
@@ -94,6 +103,8 @@ export class PaymentsController {
    * GET /payments
    */
   @Get('payments')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'List the current user’s payments' })
   async list(
     @CurrentUser() user: UserPrincipal,
     @Query() query: ListPaymentsQueryDto,
@@ -107,6 +118,8 @@ export class PaymentsController {
 
   @Get('admin/payments')
   @Roles('admin', 'finance_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: list all payments' })
   async listAdmin(
     @Query() query: AdminListPaymentsQueryDto,
   ): Promise<AdminPaymentListResponseDto> {
@@ -115,6 +128,8 @@ export class PaymentsController {
 
   @Get('admin/payments/:id')
   @Roles('admin', 'finance_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: get a single payment' })
   async getAdmin(
     @Param('id') paymentId: string,
   ): Promise<PaymentDetailDto> {
@@ -127,6 +142,12 @@ export class PaymentsController {
 
   @Post('payments/webhook/momo')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'MoMo webhook (public, signature-verified)',
+    description:
+      'Public endpoint, must be reachable by MoMo servers. The body ' +
+      'signature is verified server-side before any state mutation.',
+  })
   async webhookMomo(
     @Body() payload: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
@@ -142,6 +163,12 @@ export class PaymentsController {
 
   @Post('payments/webhook/vnpay')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'VNPay webhook (public, signature-verified)',
+    description:
+      'Public endpoint, must be reachable by VNPay servers. The vnp_SecureHash ' +
+      'header is verified before any state mutation.',
+  })
   async webhookVNPay(
     @Body() payload: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
@@ -157,6 +184,12 @@ export class PaymentsController {
 
   @Post('payments/webhook/paypal')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'PayPal webhook (public, signature-verified)',
+    description:
+      'Public endpoint. PayPal signature verification happens via the ' +
+      'paypal-transmission-sig header chain (transmission id, time, sig, cert url).',
+  })
   async webhookPayPal(
     @Body() payload: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,

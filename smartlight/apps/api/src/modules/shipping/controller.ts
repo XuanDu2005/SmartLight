@@ -33,12 +33,15 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ShippingProvider } from '@prisma/client';
 
 import { ShippingService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { Public } from '../auth/decorators/public.decorator';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import type {
   AdminListShipmentsQueryDto,
@@ -58,6 +61,7 @@ import type {
 } from './dto/shipping-response.dto';
 import { toProviderEnum } from './constants/shipping.constants';
 
+@ApiTags('Shipping')
 @Controller()
 export class ShippingController {
   constructor(private readonly shippingService: ShippingService) {}
@@ -71,7 +75,9 @@ export class ShippingController {
    *
    * Public list of available providers with their enabled status.
    */
+  @Public()
   @Get('shipping/providers')
+  @ApiOperation({ summary: 'List available shipping providers' })
   listProviders(): ProviderInfoDto[] {
     return this.shippingService.listProviders();
   }
@@ -81,8 +87,10 @@ export class ShippingController {
    *
    * Public fee estimator (used by checkout for live preview).
    */
+  @Public()
   @Post('shipping/fee')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Estimate shipping fee' })
   async estimateFee(@Body() dto: EstimateFeeDto): Promise<FeeEstimateResponseDto> {
     return this.shippingService.estimateFee(dto);
   }
@@ -94,6 +102,8 @@ export class ShippingController {
    */
   @Post('shipping')
   @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Create a shipment for an order' })
   async create(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: CreateShipmentDto,
@@ -105,6 +115,8 @@ export class ShippingController {
    * GET /shipping/:shipmentId
    */
   @Get('shipping/:shipmentId')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Get a shipment by id' })
   async getOne(
     @CurrentUser() user: UserPrincipal,
     @Param('shipmentId') id: string,
@@ -117,7 +129,9 @@ export class ShippingController {
    *
    * Public tracking view (rate-limited in real deployment).
    */
+  @Public()
   @Get('shipping/tracking/:trackingNumber')
+  @ApiOperation({ summary: 'Public tracking lookup' })
   async track(
     @Param('trackingNumber') tn: string,
   ): Promise<PublicTrackingResponseDto> {
@@ -130,6 +144,8 @@ export class ShippingController {
 
   @Get('admin/shipping')
   @Roles('admin', 'order_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: list all shipments' })
   async listAdmin(
     @Query() query: AdminListShipmentsQueryDto,
   ): Promise<ShipmentListResponseDto> {
@@ -145,6 +161,8 @@ export class ShippingController {
 
   @Get('admin/shipping/:id')
   @Roles('admin', 'order_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: get a shipment by id' })
   async getAdmin(
     @Param('id') id: string,
   ): Promise<ShipmentResponseDto> {
@@ -154,6 +172,8 @@ export class ShippingController {
   @Post('admin/shipping')
   @Roles('admin', 'order_manager')
   @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: create a shipment on behalf of a user' })
   async createAdmin(
     @Body() dto: CreateShipmentDto,
   ): Promise<ShipmentResponseDto> {
@@ -163,6 +183,8 @@ export class ShippingController {
 
   @Patch('admin/shipping/:id/ship')
   @Roles('admin', 'order_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: mark a shipment as PICKED_UP' })
   async ship(
     @CurrentUser() admin: UserPrincipal,
     @Param('id') id: string,
@@ -188,6 +210,8 @@ export class ShippingController {
 
   @Patch('admin/shipping/:id/status')
   @Roles('admin', 'order_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: update shipment status' })
   async updateStatus(
     @CurrentUser() admin: UserPrincipal,
     @Param('id') id: string,
@@ -207,6 +231,8 @@ export class ShippingController {
 
   @Patch('admin/shipping/:id/cancel')
   @Roles('admin', 'order_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: cancel a shipment' })
   async cancelAdmin(
     @CurrentUser() admin: UserPrincipal,
     @Param('id') id: string,
@@ -224,8 +250,14 @@ export class ShippingController {
   /*  Webhooks (public, signature-verified)                          */
   /* ============================================================== */
 
+  @Public()
   @Post('shipping/webhook/ghn')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'GHN webhook (public, signature-verified)',
+    description:
+      'Reachable by GHN servers. Signature verified via x-ghn-signature.',
+  })
   async webhookGHN(
     @Body() payload: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
@@ -239,8 +271,14 @@ export class ShippingController {
     return { received: true, processed: result.processed };
   }
 
+  @Public()
   @Post('shipping/webhook/ghtk')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'GHTK webhook (public, signature-verified)',
+    description:
+      'Reachable by GHTK servers. Signature verified via x-ghtk-signature.',
+  })
   async webhookGHTK(
     @Body() payload: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
@@ -254,8 +292,14 @@ export class ShippingController {
     return { received: true, processed: result.processed };
   }
 
+  @Public()
   @Post('shipping/webhook/viettel')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Viettel Post webhook (public, signature-verified)',
+    description:
+      'Reachable by Viettel Post servers. Signature verified via x-vtp-signature.',
+  })
   async webhookViettel(
     @Body() payload: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,

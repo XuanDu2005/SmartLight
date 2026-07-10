@@ -28,17 +28,13 @@ COPY apps/admin/package.json        ./apps/admin/
 RUN pnpm install --filter @smartlight/api... --frozen-lockfile || pnpm install --filter @smartlight/api...
 
 # Generate Prisma client
-COPY prisma ./prisma
+COPY apps/api/prisma ./apps/api/prisma
 RUN pnpm --filter @smartlight/api exec prisma generate
 
 # Build sources
 COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm --filter @smartlight/api run build
-
-# Prune dev deps for production
-RUN pnpm --filter @smartlight/api... --prod deploy /tmp/api-deploy || true
-RUN pnpm deploy --filter @smartlight/api --prod /tmp/api-deploy || true
 
 # ---- Stage 2: runtime ----
 FROM node:20-alpine AS runtime
@@ -55,14 +51,13 @@ RUN addgroup -g 1001 smartlight \
   && adduser -S -G smartlight -u 1001 smartlight
 
 # Copy built artifacts
-COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
 COPY --from=builder /app/apps/api/nest-cli.json ./apps/api/nest-cli.json
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 
 # Re-link (non-root) ownership
 RUN chown -R smartlight:smartlight /app
@@ -73,4 +68,4 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD curl -fsS http://localhost:4000/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "-r", "./apps/api/dist/apps/api/src/register.js", "apps/api/dist/apps/api/src/main.js"]
+CMD ["node", "-r", "./dist/apps/api/src/register.js", "dist/apps/api/src/main.js"]

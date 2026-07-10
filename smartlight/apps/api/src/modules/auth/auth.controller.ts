@@ -19,6 +19,13 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -56,7 +63,9 @@ import type { UserPrincipal } from '../users/interfaces/user-principal.interface
 import type { RefreshTokenClaims } from '../../platform/security/token.service';
 import { AUTH_CONSTANTS } from '../../platform/security/auth.constants';
 import { generateRefreshToken } from '../../platform/security/token.util';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -71,6 +80,16 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Register a new customer account',
+    description:
+      'Creates a new customer user with a local credentials (email + password) account. ' +
+      'A verification email is dispatched (logged in dev) and the account is ' +
+      'in PENDING_VERIFICATION state until /auth/verify-email is called.',
+  })
+  @ApiResponse({ status: 201, description: 'Account created' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  @ApiResponse({ status: 422, description: 'Validation error (weak password, etc.)' })
   async register(
     @Body() dto: RegisterDto,
     @Req() req: Request,
@@ -88,6 +107,16 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Customer login',
+    description:
+      'Authenticates a customer by email + password. Issues a fresh access + refresh token pair ' +
+      'and sets the refresh token as an HTTP-only cookie. Triggers account lockout after 5 failed ' +
+      'attempts within 30 minutes.',
+  })
+  @ApiResponse({ status: 200, description: 'Token pair issued' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 423, description: 'Account locked' })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
@@ -108,6 +137,16 @@ export class AuthController {
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Rotate refresh token',
+    description:
+      'Exchanges a valid refresh token (cookie or body) for a new access+refresh pair. ' +
+      'Implements theft detection: reuse of a previously-rotated token revokes ALL sessions ' +
+      'for the subject.',
+  })
+  @ApiCookieAuth('smartlight.rt')
+  @ApiResponse({ status: 200, description: 'Token pair issued' })
+  @ApiResponse({ status: 401, description: 'Refresh token invalid or expired' })
   async refresh(
     @Body() dto: RefreshDto,
     @Req() req: Request,
@@ -129,6 +168,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Logout the current session' })
+  @ApiResponse({ status: 204, description: 'Session revoked' })
   async logout(
     @CurrentUser() user: UserPrincipal,
     @Res({ passthrough: true }) res: Response,
@@ -140,6 +182,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout-all')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Revoke every active session for the current user' })
+  @ApiResponse({ status: 200, description: 'Sessions revoked' })
   async logoutAll(
     @CurrentUser() user: UserPrincipal,
   ): Promise<LogoutAllResponseDto> {
@@ -153,6 +198,13 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Request a password-reset email',
+    description:
+      'Always returns success to avoid leaking account existence. In dev the reset ' +
+      'token is logged to the application console.',
+  })
+  @ApiResponse({ status: 200, description: 'Reset email dispatched (if account exists)' })
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
   ): Promise<{ sent: boolean }> {
@@ -162,6 +214,9 @@ export class AuthController {
   @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with a valid reset token' })
+  @ApiResponse({ status: 200, description: 'Password changed' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
   async resetPassword(
     @Body() dto: ResetPasswordDto,
   ): Promise<PasswordResetResponseDto> {
@@ -171,6 +226,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Change the password of the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Password changed' })
   async changePassword(
     @CurrentUser('id') userId: string,
     @Body() dto: ChangePasswordDto,
@@ -189,6 +247,9 @@ export class AuthController {
   @Public()
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify an email via the token sent at registration' })
+  @ApiResponse({ status: 200, description: 'Email verified' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
   async verifyEmail(
     @Body() dto: VerifyEmailDto,
   ): Promise<EmailVerifiedResponseDto> {
@@ -198,6 +259,8 @@ export class AuthController {
   @Public()
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Re-dispatch the verification email' })
+  @ApiResponse({ status: 200, description: 'Verification email dispatched (if eligible)' })
   async resendVerification(
     @Body() dto: ResendVerificationDto,
   ): Promise<{ sent: boolean }> {
@@ -210,6 +273,14 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({
+    summary: 'Get the currently authenticated user (or admin)',
+    description:
+      'Returns the User principal for customer tokens and the AdminUser ' +
+      'principal for admin tokens. Audience is detected from the JWT.',
+  })
+  @ApiResponse({ status: 200, description: 'Current user payload' })
   async me(
     @CurrentUser() user: UserPrincipal,
   ): Promise<CurrentUserResponseDto | { admin: unknown }> {
@@ -242,6 +313,9 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('sessions')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'List active sessions for the current user' })
+  @ApiResponse({ status: 200, description: 'Active sessions' })
   async listSessions(@Req() req: Request): Promise<ListSessionsResponseDto> {
     const user = req.user as UserPrincipal;
     const rows = await this.auth.prisma.userSession.findMany({
@@ -266,6 +340,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Delete('sessions/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Revoke a single session (cannot revoke the current one)' })
+  @ApiResponse({ status: 204, description: 'Session revoked' })
+  @ApiResponse({ status: 400, description: 'Cannot revoke the current session' })
   async revokeSession(
     @Param() params: RevokeSessionParamDto,
     @CurrentUser() user: UserPrincipal,
@@ -293,6 +371,9 @@ export class AuthController {
   @Public()
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Admin login (no MFA in V1)' })
+  @ApiResponse({ status: 200, description: 'Admin token pair issued' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async adminLogin(
     @Body() dto: AdminLoginDto,
     @Req() req: Request,
@@ -311,6 +392,7 @@ export class AuthController {
   @Public()
   @Post('admin/mfa/verify')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify admin MFA (reserved — not yet implemented in V1)' })
   async adminVerifyMfa(
     @Body() _dto: AdminVerifyMfaDto,
   ): Promise<{ status: 'mfa_not_implemented' }> {
@@ -329,6 +411,7 @@ export class AuthController {
    */
   @Public()
   @Get('oauth/:provider/authorize')
+  @ApiOperation({ summary: 'Start an OAuth flow (Google / Facebook)' })
   async oauthAuthorize(
     @Param('provider') provider: string,
     @Req() req: Request,
@@ -364,6 +447,7 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('oauth/google')
+  @ApiOperation({ summary: 'Google OAuth entry point (Passport-managed redirect)' })
   google(): void {
     // Passport handles the redirect.
   }
@@ -371,6 +455,8 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleAuthGuard)
   @Get('oauth/google/callback')
+  @ApiOperation({ summary: 'Google OAuth callback' })
+  @ApiResponse({ status: 302, description: 'Redirects to FRONTEND_BASE_URL/oauth/callback' })
   async googleCallback(
     @Req() req: Request,
     @Res() res: Response,
@@ -395,6 +481,7 @@ export class AuthController {
   @Public()
   @UseGuards(FacebookAuthGuard)
   @Get('oauth/facebook')
+  @ApiOperation({ summary: 'Facebook OAuth entry point (Passport-managed redirect)' })
   facebook(): void {
     // Passport handles the redirect.
   }
@@ -402,6 +489,8 @@ export class AuthController {
   @Public()
   @UseGuards(FacebookAuthGuard)
   @Get('oauth/facebook/callback')
+  @ApiOperation({ summary: 'Facebook OAuth callback' })
+  @ApiResponse({ status: 302, description: 'Redirects to FRONTEND_BASE_URL/oauth/callback' })
   async facebookCallback(
     @Req() req: Request,
     @Res() res: Response,

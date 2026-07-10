@@ -14,7 +14,8 @@
   "dependencies": {
     "@smartlight/shared": "workspace:*",
     "clsx": "^2.1.0",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
@@ -23,8 +24,5 @@
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "typescript": "^5.5.0"
-  },
-  "peerDependencies": {
-    "react": "^18.3.1"
   }
 }

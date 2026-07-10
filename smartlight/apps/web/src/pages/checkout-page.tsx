@@ -1,6 +1,11 @@
+import { EmptyState } from '@smartlight/ui';
+
 export const CheckoutPage = (): JSX.Element => (
-  <section className="px-6 py-12">
-    <h1 className="text-2xl font-bold">Thanh to\u00e1n</h1>
-    <p className="mt-2 text-neutral-600">Quy tr\u00ecnh thanh to\u00e1n s\u1ebd hi\u1ec3n th\u1ecb \u1edf \u0111\u00e2y.</p>
+  <section className="container-page py-12">
+    <h1 className="mb-6 text-2xl font-semibold text-neutral-900">Thanh toán</h1>
+    <EmptyState
+      title="Sắp ra mắt"
+      description="Chức năng thanh toán sẽ được kết nối với Cart API ở giai đoạn tiếp theo."
+    />
   </section>
 );

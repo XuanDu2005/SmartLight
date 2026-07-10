@@ -24,11 +24,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { NotificationService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import {
   CreateTemplateDto,
@@ -43,6 +45,8 @@ import type {
   QueueNotificationResponseDto,
 } from './dto/notification-response.dto';
 
+@ApiTags('Notifications')
+@ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @Controller()
 @Roles('admin', 'marketing_manager', 'support')
 export class NotificationController {
@@ -52,6 +56,7 @@ export class NotificationController {
 
   @Post('admin/notifications')
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Queue a notification (email/sms/push/in-app)' })
   async queue(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: QueueNotificationDto,
@@ -66,6 +71,7 @@ export class NotificationController {
   }
 
   @Get('admin/notifications')
+  @ApiOperation({ summary: 'List notifications with filters' })
   async list(
     @Query() query: ListNotificationsQueryDto,
   ): Promise<NotificationListResponseDto> {
@@ -73,6 +79,7 @@ export class NotificationController {
   }
 
   @Get('admin/notifications/:id')
+  @ApiOperation({ summary: 'Get a notification by id' })
   async get(
     @Param('id') id: string,
   ): Promise<NotificationResponseDto> {
@@ -81,6 +88,7 @@ export class NotificationController {
 
   @Post('admin/notifications/:id/retry')
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Retry a failed notification' })
   async retry(
     @Param('id') id: string,
   ): Promise<NotificationResponseDto> {
@@ -90,6 +98,7 @@ export class NotificationController {
 
   @Delete('admin/notifications/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cancel a notification' })
   async cancel(
     @Param('id') id: string,
   ): Promise<void> {
@@ -99,6 +108,7 @@ export class NotificationController {
   /* ---------------- Templates ---------------- */
 
   @Get('admin/notification-templates')
+  @ApiOperation({ summary: 'List notification templates' })
   async listTemplates(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -122,6 +132,7 @@ export class NotificationController {
 
   @Post('admin/notification-templates')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a notification template' })
   async createTemplate(
     @Body() dto: CreateTemplateDto,
   ): Promise<NotificationTemplateResponseDto> {
@@ -129,6 +140,7 @@ export class NotificationController {
   }
 
   @Patch('admin/notification-templates/:id')
+  @ApiOperation({ summary: 'Update a notification template' })
   async updateTemplate(
     @Param('id') id: string,
     @Body() dto: UpdateTemplateDto,
@@ -138,6 +150,7 @@ export class NotificationController {
 
   @Delete('admin/notification-templates/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a notification template' })
   async deleteTemplate(
     @Param('id') id: string,
   ): Promise<void> {

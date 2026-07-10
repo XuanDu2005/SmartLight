@@ -19,11 +19,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { CartService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import {
   AddCartItemDto,
@@ -41,6 +47,8 @@ import type {
   CartSummaryDto,
 } from './dto/cart-response.dto';
 
+@ApiTags('Cart')
+@ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @Controller()
 export class CartController {
   constructor(private readonly cartService: CartService) {}
@@ -50,17 +58,20 @@ export class CartController {
   /* ============================================================== */
 
   @Get('cart')
+  @ApiOperation({ summary: 'Get the current user’s active cart' })
   async getCart(@CurrentUser() user: UserPrincipal): Promise<CartResponseDto> {
     return this.cartService.getOrCreateActiveCart(user.id);
   }
 
   @Get('cart/summary')
+  @ApiOperation({ summary: 'Get cart summary (totals, item count)' })
   async getCartSummary(@CurrentUser() user: UserPrincipal): Promise<CartSummaryDto> {
     return this.cartService.getSummary(user.id);
   }
 
   @Post('cart/items')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Add an item to the active cart' })
   async addItem(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: AddCartItemDto,
@@ -69,6 +80,7 @@ export class CartController {
   }
 
   @Patch('cart/items/:id')
+  @ApiOperation({ summary: 'Update a cart item (quantity, selection, notes)' })
   async updateItem(
     @CurrentUser() user: UserPrincipal,
     @Param('id') itemId: string,
@@ -78,6 +90,7 @@ export class CartController {
   }
 
   @Delete('cart/items/:id')
+  @ApiOperation({ summary: 'Remove a single item from the cart' })
   async removeItem(
     @CurrentUser() user: UserPrincipal,
     @Param('id') itemId: string,
@@ -92,6 +105,7 @@ export class CartController {
    * a single round-trip vs. N sequential DELETE calls.
    */
   @Patch('cart/items/bulk-remove')
+  @ApiOperation({ summary: 'Bulk-remove multiple items from the cart' })
   async bulkRemoveItems(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: BulkRemoveCartItemsDto,
@@ -101,11 +115,13 @@ export class CartController {
 
   @Delete('cart/clear')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove all items from the active cart' })
   async clearCart(@CurrentUser() user: UserPrincipal): Promise<CartResponseDto> {
     return this.cartService.clearCart(user.id);
   }
 
   @Patch('cart/items/select')
+  @ApiOperation({ summary: 'Bulk-select or deselect cart items' })
   async selectItems(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: SelectCartItemsDto,
@@ -122,6 +138,7 @@ export class CartController {
    */
   @Post('cart/merge')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Merge a local cart into the server cart' })
   async mergeCart(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: MergeCartDto,
@@ -131,6 +148,7 @@ export class CartController {
 
   @Delete('cart')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Soft-delete the active cart' })
   async deleteCart(@CurrentUser() user: UserPrincipal): Promise<void> {
     await this.cartService.deleteCart(user.id);
   }
@@ -142,6 +160,7 @@ export class CartController {
    */
   @Post('cart/coupon')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apply a coupon code to the cart (preview only)' })
   async applyCoupon(
     @CurrentUser() user: UserPrincipal,
     @Body() _dto: ApplyCouponDto,
@@ -156,6 +175,7 @@ export class CartController {
 
   @Get('admin/carts')
   @Roles('admin', 'catalog_manager', 'order_manager')
+  @ApiOperation({ summary: 'Admin: list all carts' })
   async listAdmin(
     @Query() query: AdminListCartsQueryDto,
   ): Promise<AdminCartListResponseDto> {
@@ -164,6 +184,7 @@ export class CartController {
 
   @Get('admin/carts/:id')
   @Roles('admin', 'catalog_manager', 'order_manager')
+  @ApiOperation({ summary: 'Admin: get a single cart' })
   async getAdmin(@Param('id') id: string): Promise<CartResponseDto> {
     return this.cartService.getCartForAdmin(id);
   }

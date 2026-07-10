@@ -20,11 +20,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { OrdersService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import type {
   AdminListOrdersQueryDto,
@@ -40,6 +42,8 @@ import type {
   OrderSummaryDto,
 } from './dto/order-response.dto';
 
+@ApiTags('Orders')
+@ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @Controller()
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -55,6 +59,7 @@ export class OrdersController {
    */
   @Post('orders')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create an order from a RESERVED checkout session' })
   async createOrder(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: CreateOrderDto,
@@ -68,6 +73,7 @@ export class OrdersController {
    * List the authenticated customer's orders.
    */
   @Get('orders')
+  @ApiOperation({ summary: 'List the current user’s orders' })
   async listOrders(
     @CurrentUser() user: UserPrincipal,
     @Query() query: ListOrdersQueryDto,
@@ -81,6 +87,7 @@ export class OrdersController {
    * Get a specific order. Ownership is enforced at the service layer.
    */
   @Get('orders/:id')
+  @ApiOperation({ summary: 'Get a single order by id' })
   async getOrder(
     @CurrentUser() user: UserPrincipal,
     @Param('id') orderId: string,
@@ -94,6 +101,7 @@ export class OrdersController {
    * Customer-initiated cancellation. Allowed only when status is PENDING_PAYMENT.
    */
   @Patch('orders/:id/cancel')
+  @ApiOperation({ summary: 'Cancel an order (customer)' })
   async cancelOrder(
     @CurrentUser() user: UserPrincipal,
     @Param('id') orderId: string,
@@ -108,6 +116,7 @@ export class OrdersController {
 
   @Get('admin/orders')
   @Roles('admin', 'order_manager')
+  @ApiOperation({ summary: 'Admin: list all orders' })
   async listAdmin(
     @Query() query: AdminListOrdersQueryDto,
   ): Promise<AdminOrderListResponseDto> {
@@ -116,6 +125,7 @@ export class OrdersController {
 
   @Get('admin/orders/:id')
   @Roles('admin', 'order_manager')
+  @ApiOperation({ summary: 'Admin: get a single order' })
   async getAdmin(
     @Param('id') orderId: string,
   ): Promise<OrderResponseDto> {
@@ -129,6 +139,7 @@ export class OrdersController {
    */
   @Patch('admin/orders/:id/status')
   @Roles('admin', 'order_manager')
+  @ApiOperation({ summary: 'Admin: update order status (state machine)' })
   async updateStatus(
     @CurrentUser() admin: UserPrincipal,
     @Param('id') orderId: string,

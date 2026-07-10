@@ -4,6 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "declaration": true,
     "composite": true
   },

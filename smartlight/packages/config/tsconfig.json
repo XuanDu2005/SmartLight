@@ -2,9 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "composite": true
+    "baseUrl": "./src",
+    "paths": {
+      "@smartlight/shared": ["../../shared/src/index.ts"],
+      "@smartlight/shared/*": ["../../shared/src/*"]
+    },
+    "declaration": true
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]

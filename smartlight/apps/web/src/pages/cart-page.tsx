@@ -1,6 +1,17 @@
+import { Link } from 'react-router-dom';
+import { Button, EmptyState } from '@smartlight/ui';
+
 export const CartPage = (): JSX.Element => (
-  <section className="px-6 py-12">
-    <h1 className="text-2xl font-bold">Gi\u1ecf h\u00e0ng</h1>
-    <p className="mt-2 text-neutral-600">Gi\u1ecf h\u00e0ng c\u1ee7a b\u1ea1n \u0111ang tr\u1ed1ng.</p>
+  <section className="container-page py-12">
+    <h1 className="mb-6 text-2xl font-semibold text-neutral-900">Giỏ hàng</h1>
+    <EmptyState
+      title="Giỏ hàng của bạn đang trống"
+      description="Thêm sản phẩm vào giỏ để bắt đầu mua sắm."
+      action={
+        <Link to="/products">
+          <Button variant="primary">Khám phá sản phẩm</Button>
+        </Link>
+      }
+    />
   </section>
 );

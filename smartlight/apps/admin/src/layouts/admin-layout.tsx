@@ -1,44 +1,69 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Badge, Button } from '@smartlight/ui';
+import { useAdminAuth } from '../contexts/auth-context';
 
 const navItems = [
-  { to: '/', label: 'T\u1ed5ng quan', end: true },
-  { to: '/products', label: 'S\u1ea3n ph\u1ea9m' },
-  { to: '/orders', label: '\u0110\u01a1n h\u00e0ng' },
-  { to: '/users', label: 'Ng\u01b0\u1eddi d\u00f9ng' },
+  { to: '/', label: 'Tổng quan', end: true },
+  { to: '/products', label: 'Sản phẩm' },
+  { to: '/orders', label: 'Đơn hàng' },
+  { to: '/users', label: 'Người dùng' },
   { to: '/audit', label: 'Audit Log' },
 ];
 
 /**
- * Admin shell layout: sidebar + main content.
+ * Admin shell layout: sidebar + main content. Pulls auth state
+ * from <AdminAuthProvider> to display current user + logout.
  */
-export const AdminLayout = (): JSX.Element => (
-  <div className="min-h-screen flex bg-neutral-100 text-neutral-900">
-    <aside className="w-60 bg-neutral-900 text-neutral-100 flex flex-col">
-      <div className="px-5 py-5 text-lg font-semibold border-b border-neutral-800">
-        <Link to="/">SmartLight Admin</Link>
-      </div>
-      <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `block px-3 py-2 rounded text-sm ${
-                isActive ? 'bg-neutral-800 text-white' : 'hover:bg-neutral-800'
-              }`
-            }
+export const AdminLayout = (): JSX.Element => {
+  const { user, logout } = useAdminAuth();
+
+  return (
+    <div className="flex min-h-screen bg-neutral-100 text-neutral-900">
+      <aside className="flex w-60 flex-col bg-neutral-900 text-neutral-100">
+        <div className="border-b border-neutral-800 px-5 py-5 text-lg font-semibold">
+          <Link to="/">SmartLight Admin</Link>
+        </div>
+        <nav className="flex-1 space-y-1 p-3">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                [
+                  'block rounded px-3 py-2 text-sm transition-colors',
+                  isActive
+                    ? 'bg-smart-600 text-white'
+                    : 'text-neutral-300 hover:bg-neutral-800 hover:text-white',
+                ].join(' ')
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="border-t border-neutral-800 px-5 py-3 text-xs text-neutral-500">
+          v0.1.0
+        </div>
+      </aside>
+      <main className="flex-1 overflow-auto">
+        <div className="flex h-14 items-center justify-between border-b border-neutral-200 bg-white px-6">
+          <div className="flex items-center gap-2">
+            <Badge variant="info">Admin</Badge>
+            <span className="text-sm text-neutral-500">
+              {user?.displayName ?? user?.email ?? 'Admin'}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void logout()}
           >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="px-5 py-3 text-xs text-neutral-500 border-t border-neutral-800">
-        v0.1.0 \u00b7 bootstrap
-      </div>
-    </aside>
-    <main className="flex-1 overflow-auto">
-      <Outlet />
-    </main>
-  </div>
-);
+            Đăng xuất
+          </Button>
+        </div>
+        <Outlet />
+      </main>
+    </div>
+  );
+};

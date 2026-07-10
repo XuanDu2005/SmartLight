@@ -23,12 +23,14 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { MediaService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import {
   AttachMediaDto,
@@ -44,6 +46,8 @@ import type {
 } from './dto/media-response.dto';
 import { MEDIA_CONSTANTS } from './constants/media.constants';
 
+@ApiTags('Media')
+@ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @Controller('admin/media')
 @Roles('admin', 'catalog_manager', 'marketing_manager')
 export class MediaController {
@@ -54,6 +58,7 @@ export class MediaController {
    */
   @Post('upload-url')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a remote URL as a media file' })
   async uploadFromUrl(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: CreateMediaFromUrlDto,
@@ -66,6 +71,7 @@ export class MediaController {
    */
   @Post('upload-buffer')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Upload a file buffer (multipart)' })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: MEDIA_CONSTANTS.MAX_UPLOAD_BYTES },
@@ -96,6 +102,7 @@ export class MediaController {
    * List media with optional filters.
    */
   @Get()
+  @ApiOperation({ summary: 'List media with filters' })
   async list(
     @Query() query: ListMediaQueryDto,
   ): Promise<MediaListResponseDto> {
@@ -106,6 +113,7 @@ export class MediaController {
    * Fetch a single media file by id.
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get a single media record by id' })
   async get(@Param('id') id: string): Promise<MediaFileResponseDto> {
     return this.media.getMedia(id);
   }
@@ -114,6 +122,7 @@ export class MediaController {
    * Attach a media file to an owner (product/category/brand/...).
    */
   @Patch(':id/attach')
+  @ApiOperation({ summary: 'Attach a media file to an owner' })
   async attach(
     @Param('id') id: string,
     @Body() dto: AttachMediaDto,
@@ -126,6 +135,7 @@ export class MediaController {
    * Mint a fresh signed URL for a private asset.
    */
   @Get(':id/signed-url')
+  @ApiOperation({ summary: 'Mint a signed URL for a private asset' })
   async signedUrl(
     @Param('id') id: string,
     @Query() query: SignedUrlQueryDto,
@@ -138,6 +148,7 @@ export class MediaController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Soft-delete a media record' })
   async delete(@Param('id') id: string): Promise<void> {
     return this.media.softDelete(id);
   }

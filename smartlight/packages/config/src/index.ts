@@ -8,3 +8,4 @@ export * from './env';
 export * from './api-env';
 export * from './web-env';
 export * from './admin-env';
+export * from './tailwind-preset';

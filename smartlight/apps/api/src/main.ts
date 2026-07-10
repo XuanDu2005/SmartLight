@@ -11,8 +11,20 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 import { parseApiEnv } from '@smartlight/config';
+import {
+  buildSwaggerConfig,
+  SWAGGER_PATH,
+  SWAGGER_BEARER_AUTH,
+  SWAGGER_REFRESH_COOKIE_AUTH,
+} from './config/swagger';
+import { assertValidEnv } from './config/env.validation';
 
 async function bootstrap(): Promise<void> {
+  // Phase 17.5: fail-fast environment validation (class-validator).
+  // Runs BEFORE NestFactory.create() so we never bind to a port with
+  // a misconfigured process.
+  assertValidEnv();
+
   const env = parseApiEnv();
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
@@ -53,7 +65,7 @@ async function bootstrap(): Promise<void> {
   });
 
   app.setGlobalPrefix('v1', {
-    exclude: ['/health', '/', '/api/docs', '/api/docs-json'],
+    exclude: ['/health', '/', `/${SWAGGER_PATH}`, `/${SWAGGER_PATH}-json`],
   });
 
   app.useGlobalPipes(
@@ -67,37 +79,19 @@ async function bootstrap(): Promise<void> {
   );
 
   // OpenAPI / Swagger UI
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('SmartLight API')
-    .setDescription(
-      'SmartLight e-commerce backend API. Routes are namespaced under /v1.',
-    )
-    .setVersion('0.1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        in: 'header',
-        description: 'Paste the access token from /v1/auth/login here',
-      },
-      'bearer',
-    )
-    .addCookieAuth(
-      'smartlight.rt',
-      {
-        type: 'apiKey',
-        in: 'cookie',
-        name: 'smartlight.rt',
-        description: 'Refresh token cookie used by /v1/auth/refresh',
-      },
-      'cookie',
-    )
-    .build();
+  const swaggerConfig = buildSwaggerConfig().build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, swaggerDocument, {
-    swaggerOptions: { persistAuthorization: true },
+  SwaggerModule.setup(SWAGGER_PATH, app, swaggerDocument, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+      docExpansion: 'none',
+      filter: true,
+      tryItOutEnabled: true,
+    },
+    customSiteTitle: 'SmartLight API — OpenAPI Explorer',
   });
 
   // Graceful shutdown

@@ -1,5 +1,5 @@
 /**
- * InventoryController \u2014 admin-only routes.
+ * InventoryController — admin-only routes.
  *
  * All routes require @Roles('admin', 'inventory_manager').
  * There is no public customer-facing inventory API (stock levels are
@@ -21,11 +21,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { InventoryService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { Public } from '../auth/decorators/public.decorator';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import type {
   BulkAdjustmentDto,
@@ -46,6 +49,7 @@ import type {
   StockMovementListResponseDto,
 } from './dto/inventory-response.dto';
 
+@ApiTags('Inventory')
 @Controller()
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
@@ -57,10 +61,12 @@ export class InventoryController {
   /**
    * GET /catalog/variants/:variantId/availability
    *
-   * Public endpoint \u2014 no auth required. Returns stock availability for
+   * Public endpoint — no auth required. Returns stock availability for
    * the catalog frontend. Cached by the catalog service (30s TTL).
    */
+  @Public()
   @Get('catalog/variants/:variantId/availability')
+  @ApiOperation({ summary: 'Public: variant stock availability' })
   async getVariantAvailability(
     @Param('variantId') variantId: string,
   ): Promise<InventoryAvailabilityDto> {
@@ -78,6 +84,8 @@ export class InventoryController {
    */
   @Get('admin/inventory')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: list inventory records' })
   async list(
     @Query() query: ListInventoryQueryDto,
   ): Promise<InventoryListResponseDto> {
@@ -91,6 +99,8 @@ export class InventoryController {
    */
   @Get('admin/inventory/low-stock')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: low-stock variants' })
   async listLowStock(): Promise<LowStockListResponseDto> {
     return this.inventoryService.listLowStock(50);
   }
@@ -102,6 +112,8 @@ export class InventoryController {
    */
   @Get('admin/inventory/:variantId')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: get inventory for a variant' })
   async getByVariant(
     @Param('variantId') variantId: string,
   ): Promise<InventoryStockDto> {
@@ -115,6 +127,8 @@ export class InventoryController {
    */
   @Get('admin/inventory/:variantId/movements')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: stock movement history' })
   async getMovements(
     @Param('variantId') variantId: string,
     @Query() query: ListMovementsQueryDto,
@@ -131,6 +145,8 @@ export class InventoryController {
   @Post('admin/inventory')
   @Roles('admin', 'inventory_manager')
   @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: create inventory record' })
   async create(
     @CurrentUser() admin: UserPrincipal,
     @Body() dto: CreateInventoryDto,
@@ -146,6 +162,8 @@ export class InventoryController {
    */
   @Post('admin/inventory/import')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: import stock (inbound)' })
   async import(
     @CurrentUser() admin: UserPrincipal,
     @Body() dto: ImportStockDto,
@@ -161,6 +179,8 @@ export class InventoryController {
    */
   @Post('admin/inventory/adjust')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: manual stock adjustment' })
   async adjust(
     @CurrentUser() admin: UserPrincipal,
     @Body() body: { variantId: string; adjustment: StockAdjustmentDto },
@@ -179,6 +199,8 @@ export class InventoryController {
    */
   @Post('admin/inventory/bulk-adjust')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: bulk stock adjustment (≤100 variants)' })
   async bulkAdjust(
     @CurrentUser() admin: UserPrincipal,
     @Body() dto: BulkAdjustmentDto,
@@ -196,6 +218,8 @@ export class InventoryController {
    */
   @Patch('admin/inventory/:variantId/threshold')
   @Roles('admin', 'inventory_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: update low-stock threshold' })
   async updateThreshold(
     @Param('variantId') variantId: string,
     @Body() dto: UpdateLowStockThresholdDto,

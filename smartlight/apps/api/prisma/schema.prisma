@@ -23,6 +23,11 @@ datasource db {
   extensions = [citext, pgcrypto, pg_trgm]
 }
 
+// Prisma DB seed \u2014 run via: `pnpm --filter @smartlight/api prisma:seed`
+// or: `npx prisma db seed`
+// (Defined at the bottom of the schema generator section in newer Prisma,
+//  but Prisma 5 supports a top-level `db seed` block here.)
+
 // =============================================================================
 //  AUTH-ONLY ENUMS
 // =============================================================================

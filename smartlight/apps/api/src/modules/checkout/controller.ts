@@ -19,11 +19,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CheckoutService } from './service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { UserPrincipal } from '../users/interfaces/user-principal.interface';
+import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import type {
   CreateCheckoutDto,
@@ -36,6 +38,8 @@ import type {
   CheckoutResponseDto,
 } from './dto/checkout-response.dto';
 
+@ApiTags('Checkout')
+@ApiBearerAuth(SWAGGER_BEARER_AUTH)
 @Controller()
 export class CheckoutController {
   constructor(private readonly checkoutService: CheckoutService) {}
@@ -52,6 +56,12 @@ export class CheckoutController {
    */
   @Post('checkout')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create a checkout session from the active cart',
+    description:
+      'Creates a new checkout session snapshotting the active cart. ' +
+      'Idempotent via optional idempotencyKey header.',
+  })
   async createCheckout(
     @CurrentUser() user: UserPrincipal,
     @Body() dto: CreateCheckoutDto,
@@ -65,6 +75,7 @@ export class CheckoutController {
    * Retrieve a checkout session by ID. Ownership is enforced at the service layer.
    */
   @Get('checkout/:id')
+  @ApiOperation({ summary: 'Get a checkout session by id' })
   async getCheckout(
     @CurrentUser() user: UserPrincipal,
     @Param('id') sessionId: string,
@@ -80,6 +91,7 @@ export class CheckoutController {
    */
   @Post('checkout/:id/address')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update the shipping address of a checkout session' })
   async updateAddress(
     @CurrentUser() user: UserPrincipal,
     @Param('id') sessionId: string,
@@ -97,6 +109,7 @@ export class CheckoutController {
    */
   @Post('checkout/:id/reserve')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Atomically reserve inventory for the session' })
   async reserveInventory(
     @CurrentUser() user: UserPrincipal,
     @Param('id') sessionId: string,
@@ -112,6 +125,7 @@ export class CheckoutController {
    */
   @Delete('checkout/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cancel a checkout session' })
   async cancelCheckout(
     @CurrentUser() user: UserPrincipal,
     @Param('id') sessionId: string,
@@ -125,6 +139,7 @@ export class CheckoutController {
 
   @Get('admin/checkouts')
   @Roles('admin', 'catalog_manager', 'order_manager')
+  @ApiOperation({ summary: 'Admin: list checkout sessions' })
   async listAdmin(
     @Query() query: AdminListCheckoutsQueryDto,
   ): Promise<AdminCheckoutListResponseDto> {
@@ -133,6 +148,7 @@ export class CheckoutController {
 
   @Get('admin/checkouts/:id')
   @Roles('admin', 'catalog_manager', 'order_manager')
+  @ApiOperation({ summary: 'Admin: get a checkout session by id' })
   async getAdmin(
     @Param('id') sessionId: string,
   ): Promise<CheckoutResponseDto> {

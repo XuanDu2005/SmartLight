@@ -1,6 +1,11 @@
+import { EmptyState } from '@smartlight/ui';
+
 export const OrdersPage = (): JSX.Element => (
-  <section className="p-6">
-    <h1 className="text-2xl font-bold">\u0110\u01a1n h\u00e0ng</h1>
-    <p className="mt-2 text-neutral-600">Danh s\u00e1ch \u0111\u01a1n h\u00e0ng.</p>
+  <section className="container-page py-6">
+    <h1 className="mb-4 text-2xl font-semibold text-neutral-900">Đơn hàng</h1>
+    <EmptyState
+      title="Sắp ra mắt"
+      description="Trang quản lý đơn hàng sẽ kết nối với /v1/admin/orders/* ở giai đoạn tiếp theo."
+    />
   </section>
 );

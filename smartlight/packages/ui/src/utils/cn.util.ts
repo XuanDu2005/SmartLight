@@ -1,7 +1,8 @@
 import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 /**
- * Convenience class-name combiner.
- * Tailwind-aware (returns a deduplicated, conflict-resolved string).
+ * Tailwind-aware class-name combiner.
+ * Returns a deduplicated, conflict-resolved string.
  */
-export const cn = (...inputs: ClassValue[]): string => clsx(inputs);
+export const cn = (...inputs: ClassValue[]): string => twMerge(clsx(inputs));
