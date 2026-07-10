@@ -7,6 +7,9 @@ import { RequireAdminAuth } from './components/require-auth';
 import { DashboardPage } from './pages/dashboard-page';
 import { ProductsPage } from './pages/products-page';
 import { OrdersPage } from './pages/orders-page';
+import { InventoryPage } from './pages/inventory-page';
+import { PaymentsPage } from './pages/payments-page';
+import { PromotionsPage } from './pages/promotions-page';
 import { UsersPage } from './pages/users-page';
 import { AuditLogPage } from './pages/audit-log-page';
 import { LoginPage } from './pages/login-page';
@@ -28,8 +31,12 @@ export const App = (): JSX.Element => (
           }
         >
           <Route index element={<DashboardPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/promotions" element={<PromotionsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit" element={<AuditLogPage />} />
           <Route path="*" element={<NotFoundPage />} />

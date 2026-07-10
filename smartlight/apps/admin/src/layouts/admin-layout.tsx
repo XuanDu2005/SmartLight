@@ -4,8 +4,12 @@ import { useAdminAuth } from '../contexts/auth-context';
 
 const navItems = [
   { to: '/', label: 'Tổng quan', end: true },
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/products', label: 'Sản phẩm' },
   { to: '/orders', label: 'Đơn hàng' },
+  { to: '/inventory', label: 'Tồn kho' },
+  { to: '/payments', label: 'Thanh toán' },
+  { to: '/promotions', label: 'Khuyến mãi' },
   { to: '/users', label: 'Người dùng' },
   { to: '/audit', label: 'Audit Log' },
 ];

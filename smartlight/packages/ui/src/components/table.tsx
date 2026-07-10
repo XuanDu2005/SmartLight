@@ -29,6 +29,16 @@ export const THead = ({
   </thead>
 );
 
+export const TBody = ({
+  className,
+  children,
+  ...rest
+}: HTMLAttributes<HTMLTableSectionElement>): JSX.Element => (
+  <tbody className={cn('', className)} {...rest}>
+    {children}
+  </tbody>
+);
+
 export const TH = ({
   className,
   children,
