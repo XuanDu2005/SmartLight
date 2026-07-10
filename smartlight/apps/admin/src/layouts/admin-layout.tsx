@@ -6,11 +6,14 @@ const navItems = [
   { to: '/', label: 'Tổng quan', end: true },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/products', label: 'Sản phẩm' },
+  { to: '/categories', label: 'Danh mục' },
+  { to: '/brands', label: 'Thương hiệu' },
   { to: '/orders', label: 'Đơn hàng' },
   { to: '/inventory', label: 'Tồn kho' },
   { to: '/payments', label: 'Thanh toán' },
   { to: '/promotions', label: 'Khuyến mãi' },
   { to: '/users', label: 'Người dùng' },
+  { to: '/reports', label: 'Báo cáo' },
   { to: '/audit', label: 'Audit Log' },
 ];
 

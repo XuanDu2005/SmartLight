@@ -24,6 +24,22 @@ export const Card = ({
   </div>
 );
 
+/**
+ * CardBody — content section of a Card. Defaults to no extra padding
+ * so the Card's outer padding applies once (use this when you want
+ * tight tables/grids inside a card without an extra gutter).
+ */
+export interface CardBodyProps extends HTMLAttributes<HTMLDivElement> {}
+export const CardBody = ({
+  className,
+  children,
+  ...rest
+}: CardBodyProps): JSX.Element => (
+  <div className={cn(className)} {...rest}>
+    {children}
+  </div>
+);
+
 export const CardHeader = ({
   className,
   children,

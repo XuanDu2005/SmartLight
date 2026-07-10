@@ -1,139 +1,218 @@
-/**
- * Admin Payments — `/payments`.
- *
- * Lists recent payments with status, method and amount.
- */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Badge,
-  Card,
+  Breadcrumb,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
   EmptyState,
+  Input,
   Pagination,
+  Select,
   Spinner,
-  Table,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
+  StatusPill,
 } from '@smartlight/ui';
-import { apiClient } from '../lib/api-client';
+import { paymentsApi } from '../lib/payments-api';
 import { formatVND } from '../lib/format';
+import type {
+  ListPaymentsAdminParams,
+  PaymentProvider,
+  PaymentStatus,
+  PaymentSummary,
+} from '../lib/types';
 
-interface PaymentRow {
-  id: string;
-  orderId: string;
-  orderNumber: string;
-  method: 'MOMO' | 'VNPAY' | 'PAYPAL' | 'COD' | 'BANK_TRANSFER';
-  status: 'PENDING' | 'AUTHORIZED' | 'CAPTURED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
-  amount: number;
-  currency: string;
-  createdAt: string;
-  paidAt: string | null;
-}
-
-const STATUS_VARIANT: Record<PaymentRow['status'], 'success' | 'danger' | 'warning' | 'info'> = {
-  PENDING: 'warning',
-  AUTHORIZED: 'info',
-  CAPTURED: 'success',
-  FAILED: 'danger',
-  REFUNDED: 'warning',
-  CANCELLED: 'danger',
-};
-
-const STATUS_LABEL: Record<PaymentRow['status'], string> = {
-  PENDING: 'Chờ xử lý',
-  AUTHORIZED: 'Đã ủy quyền',
-  CAPTURED: 'Đã thanh toán',
-  FAILED: 'Thất bại',
-  REFUNDED: 'Hoàn tiền',
-  CANCELLED: 'Đã hủy',
-};
-
-const METHOD_LABEL: Record<PaymentRow['method'], string> = {
-  MOMO: 'MoMo',
-  VNPAY: 'VNPay',
-  PAYPAL: 'PayPal',
-  COD: 'COD',
-  BANK_TRANSFER: 'Chuyển khoản',
+const statusVariant = (s: PaymentStatus) => {
+  switch (s) {
+    case 'SUCCEEDED':
+      return 'success' as const;
+    case 'PROCESSING':
+    case 'PENDING':
+      return 'info' as const;
+    case 'FAILED':
+      return 'danger' as const;
+    case 'REFUNDED':
+      return 'warning' as const;
+    case 'CANCELLED':
+      return 'neutral' as const;
+  }
 };
 
 export const PaymentsPage = (): JSX.Element => {
-  const [rows, setRows] = useState<PaymentRow[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const limit = 20;
+  const [params, setParams] = useState<ListPaymentsAdminParams>({
+    page: 1,
+    limit: 20,
+    search: '',
+  });
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+
+  const [items, setItems] = useState<PaymentSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient
-      .get<{ data: PaymentRow[] }>('/payments', { params: { page, limit } })
-      .then((r) => setRows(r.data.data ?? []))
-      .catch((e) => setErr(e instanceof Error ? e.message : 'Lỗi'))
-      .finally(() => undefined);
-  }, [page]);
+    const t = window.setTimeout(() => setDebounced(search), 400);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  const reload = async (): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await paymentsApi.listAdmin({
+        ...params,
+        search: debounced || undefined,
+      });
+      setItems(result.items);
+      setTotal(result.total);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.page, params.limit, params.status, params.provider, debounced]);
+
+  const pageCount = Math.max(1, Math.ceil(total / (params.limit ?? 20)));
 
   return (
     <section className="container-page py-6">
-      <h1 className="mb-4 text-2xl font-semibold text-neutral-900">
-        Quản lý thanh toán
-      </h1>
-
-      {err && <EmptyState title="Lỗi tải thanh toán" description={err} />}
-
-      {!err && rows === null && (
-        <div className="flex h-64 items-center justify-center">
-          <Spinner size="lg" />
-        </div>
-      )}
-
-      {!err && rows && rows.length === 0 && (
-        <EmptyState
-          title="Chưa có giao dịch"
-          description="Các giao dịch thanh toán sẽ hiển thị tại đây."
+      <Breadcrumb
+        items={[{ label: 'Admin', href: '/' }, { label: 'Thanh toán' }]}
+        className="mb-3"
+      />
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
+        <Input
+          placeholder="Tìm mã đơn, mã giao dịch…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-      )}
+        <Select
+          value={params.provider ?? ''}
+          onChange={(e) =>
+            setParams((p) => ({
+              ...p,
+              page: 1,
+              provider: (e.target.value || undefined) as
+                | PaymentProvider
+                | undefined,
+            }))
+          }
+        >
+          <option value="">Tất cả provider</option>
+          <option value="MOMO">MoMo</option>
+          <option value="VNPAY">VNPay</option>
+          <option value="PAYPAL">PayPal</option>
+        </Select>
+        <Select
+          value={params.status ?? ''}
+          onChange={(e) =>
+            setParams((p) => ({
+              ...p,
+              page: 1,
+              status: (e.target.value || undefined) as PaymentStatus | undefined,
+            }))
+          }
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="PENDING">Chờ</option>
+          <option value="PROCESSING">Đang xử lý</option>
+          <option value="SUCCEEDED">Thành công</option>
+          <option value="FAILED">Thất bại</option>
+          <option value="REFUNDED">Đã hoàn</option>
+          <option value="CANCELLED">Đã huỷ</option>
+        </Select>
+        <Select
+          value={String(params.limit ?? 20)}
+          onChange={(e) =>
+            setParams((p) => ({ ...p, page: 1, limit: Number(e.target.value) }))
+          }
+        >
+          <option value="10">10 / trang</option>
+          <option value="20">20 / trang</option>
+          <option value="50">50 / trang</option>
+        </Select>
+      </div>
 
-      {!err && rows && rows.length > 0 && (
-        <>
-          <Card padded={false}>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Mã đơn</TH>
-                  <TH>Phương thức</TH>
-                  <TH>Số tiền</TH>
-                  <TH>Trạng thái</TH>
-                  <TH>Ngày tạo</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {rows.map((p) => (
-                  <TR key={p.id}>
-                    <TD className="font-mono text-xs">{p.orderNumber}</TD>
-                    <TD>{METHOD_LABEL[p.method] ?? p.method}</TD>
-                    <TD className="font-semibold text-neutral-900">
-                      {formatVND(p.amount)}
-                    </TD>
-                    <TD>
-                      <Badge variant={STATUS_VARIANT[p.status]}>
-                        {STATUS_LABEL[p.status] ?? p.status}
-                      </Badge>
-                    </TD>
-                    <TD>{new Date(p.createdAt).toLocaleString('vi-VN')}</TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </Card>
-          <div className="mt-4 flex justify-center">
-            <Pagination
-              page={page}
-              totalPages={Math.max(1, Math.ceil(rows.length / limit))}
-              onPageChange={setPage}
-            />
-          </div>
-        </>
-      )}
+      <DataTable stickyHeader>
+        <DataTableHead>
+          <DataTableRow density="compact">
+            <DataTableHeaderCell>Mã đơn</DataTableHeaderCell>
+            <DataTableHeaderCell>Provider</DataTableHeaderCell>
+            <DataTableHeaderCell className="text-right">Số tiền</DataTableHeaderCell>
+            <DataTableHeaderCell>Trạng thái</DataTableHeaderCell>
+            <DataTableHeaderCell>Mã giao dịch</DataTableHeaderCell>
+            <DataTableHeaderCell>Ngày tạo</DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {loading ? (
+            <DataTableRow>
+              <DataTableCell colSpan={6} className="text-center">
+                <Spinner />
+              </DataTableCell>
+            </DataTableRow>
+          ) : items.length === 0 ? (
+            <DataTableRow>
+              <DataTableCell colSpan={6}>
+                <EmptyState title="Chưa có thanh toán" />
+              </DataTableCell>
+            </DataTableRow>
+          ) : (
+            items.map((p) => (
+              <DataTableRow key={p.id}>
+                <DataTableCell>
+                  <Link
+                    to={`/payments/${p.id}`}
+                    className="font-medium text-smart-700 hover:underline"
+                  >
+                    {p.orderCode}
+                  </Link>
+                </DataTableCell>
+                <DataTableCell>
+                  <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs">
+                    {p.provider}
+                  </span>
+                </DataTableCell>
+                <DataTableCell className="text-right tabular-nums">
+                  {formatVND(p.amount?.amount ?? 0)}
+                </DataTableCell>
+                <DataTableCell>
+                  <StatusPill
+                    status={p.status}
+                    variant={statusVariant(p.status)}
+                  />
+                </DataTableCell>
+                <DataTableCell>
+                  <code className="text-xs">{p.transactionId ?? '—'}</code>
+                </DataTableCell>
+                <DataTableCell className="text-xs text-neutral-600">
+                  {new Date(p.createdAt).toLocaleString('vi-VN')}
+                </DataTableCell>
+              </DataTableRow>
+            ))
+          )}
+        </DataTableBody>
+      </DataTable>
+
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-sm text-neutral-500">
+          Tổng: {total} giao dịch
+        </span>
+        {pageCount > 1 && (
+          <Pagination
+            page={params.page ?? 1}
+            totalPages={pageCount}
+            onPageChange={(p) => setParams((prev) => ({ ...prev, page: p }))}
+          />
+        )}
+      </div>
     </section>
   );
 };

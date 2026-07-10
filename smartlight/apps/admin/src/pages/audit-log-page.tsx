@@ -1,11 +1,15 @@
-import { EmptyState } from '@smartlight/ui';
+import { Breadcrumb, EmptyState } from '@smartlight/ui';
 
 export const AuditLogPage = (): JSX.Element => (
   <section className="container-page py-6">
-    <h1 className="mb-4 text-2xl font-semibold text-neutral-900">Audit Log</h1>
+    <Breadcrumb
+      items={[{ label: 'Admin', href: '/' }, { label: 'Audit Log' }]}
+      className="mb-3"
+    />
+    <h1 className="mb-4 text-2xl font-semibold">Audit Log</h1>
     <EmptyState
-      title="Sắp ra mắt"
-      description="Trang nhật ký hoạt động sẽ kết nối với /v1/admin/audit-log ở giai đoạn tiếp theo."
+      title="Chưa có endpoint"
+      description="Backend chưa expose /v1/admin/audit. Khi endpoint được bổ sung, trang này sẽ liệt kê các thao tác của admin kèm metadata."
     />
   </section>
 );

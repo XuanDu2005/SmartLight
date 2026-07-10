@@ -17,9 +17,23 @@ export interface ToastItem {
   durationMs?: number;
 }
 
+/**
+ * Toast push accepts either:
+ *  - A simple string message (defaults to `info` variant)
+ *  - An object with `{ title, description?, variant? }` for richer toasts.
+ */
+export type ToastPushInput =
+  | string
+  | {
+      title: string;
+      description?: string;
+      variant?: ToastVariant;
+      durationMs?: number;
+    };
+
 export interface ToastContextValue {
   toasts: ToastItem[];
-  push: (message: string, variant?: ToastVariant, durationMs?: number) => string;
+  push: (input: ToastPushInput, variant?: ToastVariant) => string;
   dismiss: (id: string) => void;
 }
 
@@ -54,10 +68,23 @@ export const ToastProvider = ({
   }, []);
 
   const push = useCallback(
-    (message: string, variant: ToastVariant = 'info', durationMs = 4000) => {
+    (input: ToastPushInput, fallbackVariant: ToastVariant = 'info') => {
       counter += 1;
       const id = `toast-${Date.now()}-${counter}`;
-      setToasts((prev) => [...prev, { id, message, variant, durationMs }]);
+      const isString = typeof input === 'string';
+      const message = isString
+        ? input
+        : input.description
+          ? `${input.title} — ${input.description}`
+          : input.title;
+      const variant = isString
+        ? fallbackVariant
+        : (input.variant ?? fallbackVariant);
+      const durationMs = isString ? 4000 : (input.durationMs ?? 4000);
+      setToasts((prev) => [
+        ...prev,
+        { id, message, variant, durationMs },
+      ]);
       if (durationMs > 0) {
         setTimeout(() => dismiss(id), durationMs);
       }

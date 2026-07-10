@@ -1,10 +1,3 @@
-// =============================================================================
-//  SmartLight UI
-//  Shared primitives for storefront + admin. Tailwind-aware.
-// =============================================================================
-
-export * from './utils/cn.util';
-
 export * from './components/button';
 export * from './components/input';
 export * from './components/textarea';
@@ -12,10 +5,20 @@ export * from './components/select';
 export * from './components/form-field';
 export * from './components/card';
 export * from './components/badge';
+export * from './components/status-pill';
 export * from './components/modal';
+export * from './components/confirm-dialog';
+export * from './components/drawer';
+export * from './components/table';
+export * from './components/data-table';
+export * from './components/pagination';
 export * from './components/toast';
 export * from './components/spinner';
+export * from './components/loading-overlay';
 export * from './components/empty-state';
-export * from './components/table';
-export * from './components/pagination';
+export * from './components/skeleton';
+export * from './components/tabs';
+export * from './components/divider';
 export * from './components/image';
+export * from './components/breadcrumb';
+export { cn } from './utils/cn.util';
