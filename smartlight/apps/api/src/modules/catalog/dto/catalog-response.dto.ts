@@ -129,3 +129,4 @@ export interface BulkOperationResultDto {
   succeeded: string[];
   failed: Array<{ id: string; reason: string }>;
 }
+

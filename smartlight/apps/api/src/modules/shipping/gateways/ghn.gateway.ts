@@ -308,3 +308,4 @@ function mapGHNStatus(s: string): CallbackResult['outcome'] {
   if (t === 'FAILED' || t === 'EXCEPTION') return 'FAILED';
   return 'IN_TRANSIT';
 }
+

@@ -45,3 +45,4 @@ export class AhamoveGateway extends BaseShippingGateway {
     return super.verifyCallback(payload, headers);
   }
 }
+

@@ -41,3 +41,4 @@ export const CHECKOUT_ERROR_CODES = {
 
 export type CheckoutErrorCode =
   (typeof CHECKOUT_ERROR_CODES)[keyof typeof CHECKOUT_ERROR_CODES];
+

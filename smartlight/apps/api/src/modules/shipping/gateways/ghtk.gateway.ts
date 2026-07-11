@@ -50,3 +50,4 @@ export class GHTKGateway extends BaseShippingGateway {
     return super.verifyCallback(payload, headers);
   }
 }
+

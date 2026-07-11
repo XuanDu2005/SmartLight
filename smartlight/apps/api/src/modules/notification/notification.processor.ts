@@ -13,6 +13,7 @@
  * no-op \u2014 callers can still use queueAndWait() for inline sends.
  */
 import {
+  forwardRef,
   Inject,
   Injectable,
   Logger,
@@ -38,6 +39,7 @@ export class NotificationProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly bullLib: any | null;
 
   constructor(
+    @Inject(forwardRef(() => NotificationService))
     private readonly notifications: NotificationService,
     @Optional() @Inject(QUEUE_FACTORY) private readonly queueFactory?: QueueFactory,
   ) {

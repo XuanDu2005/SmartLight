@@ -2,37 +2,39 @@
 export {};
 
 /**
- * Process bootstrap: registers path mappings and ts-node transpile-only.
- *
- * Required by the runtime build output (dist/apps/api/src/main.js) which
- * keeps the workspace-package aliases (`@smartlight/config`, ...) and
- * therefore needs a Node-side resolver.
+ * Process bootstrap: registers path mappings so that `@smartlight/*` aliases
+ * resolve at runtime. Required because the production build keeps workspace
+ * aliases (see apps/api/tsconfig.build.json).
  *
  *   node -r ./dist/apps/api/src/register.js dist/apps/api/src/main.js
+ *
+ * In the production Docker image, `@smartlight/shared` and `@smartlight/config`
+ * ship as compiled CJS JavaScript under `packages/{shared,config}/dist`. The
+ * path mappings below rewrite the source-only entries in
+ * `tsconfig.base.json` (which point at .ts files) to the compiled .js files.
  */
 const path = require('node:path');
 const fs = require('node:fs');
 
 const { register } = require('tsconfig-paths');
-const tsNode = require('ts-node');
 
 const tsConfigPath = path.resolve(__dirname, '../../../../../../tsconfig.base.json');
 const tsConfig = JSON.parse(fs.readFileSync(tsConfigPath, 'utf8'));
 const baseUrl = path.resolve(path.dirname(tsConfigPath), '.');
 
-// Register path aliases so that `@smartlight/config` resolves to the
-// matching workspace package on disk.
+// Rewrite path mappings from .ts sources to compiled .js bundles.
+const paths: Record<string, string[]> = {};
+for (const [alias, targets] of Object.entries(tsConfig.compilerOptions.paths || {})) {
+  paths[alias] = (targets as unknown as string[]).map((t: string) => {
+    if (typeof t !== 'string') return t;
+    return t
+      .replace('/packages/shared/src/', '/packages/shared/dist/')
+      .replace('/packages/config/src/', '/packages/config/dist/config/src/')
+      .replace(/\.ts$/, '.js');
+  });
+}
+
 register({
   baseUrl,
-  paths: tsConfig.compilerOptions.paths || {},
-});
-
-// Allow Node to require `.ts` from workspace packages at runtime.
-tsNode.register({
-  transpileOnly: true,
-  project: tsConfigPath,
-  compilerOptions: {
-    module: 'commonjs',
-    moduleResolution: 'node',
-  },
+  paths,
 });

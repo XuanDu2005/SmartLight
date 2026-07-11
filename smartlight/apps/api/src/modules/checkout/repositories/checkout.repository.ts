@@ -32,7 +32,7 @@ export class CheckoutRepository {
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     return this.prisma.$transaction(fn, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: 'Serializable',
       timeout: 20_000,
     });
   }
@@ -404,3 +404,4 @@ export class CheckoutRepository {
     } as const;
   }
 }
+

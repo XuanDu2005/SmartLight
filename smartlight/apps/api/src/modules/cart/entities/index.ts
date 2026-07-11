@@ -9,3 +9,4 @@
  * transitions).
  */
 export type { CartItem, Coupon, Cart } from '@prisma/client';
+

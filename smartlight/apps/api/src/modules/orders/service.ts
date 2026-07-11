@@ -16,6 +16,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, OrderStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 import { OrdersRepository } from './repositories/orders.repository';
 import { ORDER_LIMITS } from './constants/order.constants';
@@ -52,7 +53,7 @@ import type {
   ShippingAddressDto,
 } from './dto/order-response.dto';
 
-const ZERO = new Prisma.Decimal(0);
+const ZERO = new Decimal(0);
 
 /* ============================================================== */
 /*  Order Status State Machine                                    */
@@ -667,7 +668,7 @@ export class OrdersService {
     };
   }
 
-  private d2n(d: Prisma.Decimal | number | null | undefined): number {
+  private d2n(d: Decimal | number | null | undefined): number {
     if (d === null || d === undefined) return 0;
     if (typeof d === 'number') return d;
     return (d as any).toNumber?.() ?? 0;

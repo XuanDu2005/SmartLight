@@ -16,3 +16,4 @@ export {
   VariantInActiveOrderException,
   ProductInActiveOrderException,
 } from './catalog.exceptions';
+

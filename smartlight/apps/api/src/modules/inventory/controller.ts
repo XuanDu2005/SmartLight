@@ -227,3 +227,4 @@ export class InventoryController {
     return this.inventoryService.updateLowStockThreshold(variantId, dto);
   }
 }
+

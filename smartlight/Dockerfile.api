@@ -1,119 +1,123 @@
 # =============================================================================
-# SmartLight API — production Dockerfile (multi-stage)
-#
-# Stage 1 (deps)      : install ALL workspace deps (incl. dev) so the api
-#                       can be built and prisma client generated.
-# Stage 2 (build)     : compile NestJS via nest build → apps/api/dist.
-# Stage 3 (runtime)   : install PRODUCTION-ONLY deps (`--prod`) and copy
-#                       the compiled artifact. Drop devDeps and source.
-#
-# BuildKit features used:
-#   - cache mount for pnpm store (faster rebuilds)
-#   - RUN --mount=type=cache for npm/pnpm store
-#
-# Image size target: < 250 MB (alpine + Node 20 + prod deps).
-# Runs as non-root `smartlight` user (UID 1001).
+# SmartLight API — multi-stage Dockerfile
+# - Stage 1: builder (dev deps + build shared, config, api)
+# - Stage 2: production runtime (full deps so Prisma client + helpers are present)
 # =============================================================================
 
-# ---------------------------------------------------------------------------
-# Stage 1: deps (full workspace install for building)
-# ---------------------------------------------------------------------------
-FROM node:20-alpine AS deps
-
+# ---- Stage 1: builder ----
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# pnpm via corepack (pinned)
+# pnpm
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
-# Copy lockfile + workspace metadata first → better layer caching.
+# Copy lockfiles and root manifests first (cache layer)
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY tsconfig.base.json turbo.json ./
 
-# Only copy package.jsons (no source) for `pnpm install`
-COPY packages/shared/package.json   ./packages/shared/
-COPY packages/config/package.json  ./packages/config/
+# Copy package.json files of every workspace
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/config/package.json ./packages/config/
 COPY packages/ui/package.json      ./packages/ui/
-COPY apps/api/package.json         ./apps/api/
-COPY apps/web/package.json         ./apps/web/
-COPY apps/admin/package.json       ./apps/admin/
+COPY apps/api/package.json          ./apps/api/
+COPY apps/web/package.json          ./apps/web/
+COPY apps/admin/package.json        ./apps/admin/
 
-# BuildKit cache mount: keep pnpm store across rebuilds.
+# Install all dependencies (including dev)
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --filter @smartlight/api... --frozen-lockfile
 
-# ---------------------------------------------------------------------------
-# Stage 2: build
-# ---------------------------------------------------------------------------
-FROM deps AS build
-
-WORKDIR /app
-
-# Now copy source files needed for build.
-COPY packages ./packages
-COPY apps/api ./apps/api
-
-# Generate Prisma client (debounced by schema hash via BuildKit cache).
+# Generate Prisma client (the linux-musl binary would be wrong for Debian;
+# Prisma re-detects platform per generator run, so we run it later in the
+# Debian runtime stage to produce the correct glibc engine binary.)
+COPY apps/api/prisma ./apps/api/prisma
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm --filter @smartlight/api exec prisma generate
 
-# Compile.
-RUN pnpm --filter @smartlight/api run build
+# Build shared/config first (their compiled JS is referenced by the API's
+# runtime require graph via tsconfig path mappings).
+COPY packages ./packages
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm --filter @smartlight/shared run build
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm --filter @smartlight/config run build; echo "config build exit: $?"; ls -laR /app/packages/config/dist 2>&1 | head -50
+RUN ls -la /app/packages/config/dist/index.js /app/packages/shared/dist/index.js 2>&1 || true
 
-# ---------------------------------------------------------------------------
-# Stage 3: runtime — production deps only, drop dev deps, run as non-root.
-# ---------------------------------------------------------------------------
-FROM node:20-alpine AS runtime
+# Build the API using the production tsconfig (paths point at the compiled
+# shared/config bundles rather than TS sources).
+COPY apps/api ./apps/api
+RUN rm -rf apps/api/dist apps/api/.tsbuildinfo apps/api/tsconfig.tsbuildinfo \
+ && pnpm --filter @smartlight/api exec tsc -p /app/apps/api/tsconfig.build.json
 
+# ---- Stage 2: runtime ----
+# Use Debian-slim (glibc) instead of Alpine (musl) because Prisma's bundled
+# query engine binary `libquery_engine-linux-musl.so.node` requires libssl
+# 1.1, which is no longer in Alpine 3.x repos. Debian-slim ships libssl 3.
+FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
 
-# Minimal runtime tools:
-#   - curl : HEALTHCHECK
-#   - tini : PID 1, signal forwarding, zombie reaping
-RUN apk add --no-cache curl tini
+# Add curl for healthcheck + tini for signal handling + openssl 3
+# (Prisma's bundled query engine links against libssl on Debian).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl tini openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production
+ENV PNPM_HOME=/usr/local/share/pnpm
+ENV PATH=$PNPM_HOME:$PATH
 
-ENV NODE_ENV=production \
-    PNPM_HOME=/usr/local/share/pnpm \
-    PATH=/usr/local/share/pnpm:$PATH \
-    API_PORT=4000
+# Non-root user
+RUN groupadd -g 1001 smartlight \
+  && useradd -m -s /bin/bash -u 1001 -g smartlight smartlight
 
-# Non-root user (UID/GID 1001 to match Kubernetes runAsUser guidance).
-RUN addgroup -g 1001 smartlight \
- && adduser -S -G smartlight -u 1001 smartlight
+# Copy built artifacts. Nest's tsconfig rootDir extends to monorepo root,
+# so the compiled output is at apps/api/dist/apps/api/src/* (nested).
+COPY --from=builder /app/apps/api/dist                  ./apps/api/dist
+COPY --from=builder /app/apps/api/package.json          ./apps/api/package.json
+COPY --from=builder /app/apps/api/tsconfig.json         ./apps/api/tsconfig.json
+COPY --from=builder /app/apps/api/nest-cli.json         ./apps/api/nest-cli.json
+COPY --from=builder /app/apps/api/prisma                ./apps/api/prisma
+COPY --from=builder /app/packages                       ./packages
+COPY --from=builder /app/package.json                   ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml            ./pnpm-workspace.yaml
+COPY --from=builder /app/pnpm-lock.yaml                 ./pnpm-lock.yaml
+COPY --from=builder /app/tsconfig.base.json             ./tsconfig.base.json
+# Carry the prebuilt .prisma/client (enums + types) from the builder image so
+# that runtime `@prisma/client` resolves to the generated JS with enum values.
+COPY --from=builder /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma \
+     ./node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma
 
-# Copy only the package metadata we need for a fresh prod-only install.
-COPY --from=build /app/package.json            ./package.json
-COPY --from=build /app/pnpm-workspace.yaml    ./pnpm-workspace.yaml
-COPY --from=build /app/pnpm-lock.yaml         ./pnpm-lock.yaml
-COPY --from=build /app/packages/shared/package.json   ./packages/shared/
-COPY --from=build /app/packages/config/package.json  ./packages/config/
-COPY --from=build /app/packages/shared/dist   ./packages/shared/dist
-COPY --from=build /app/packages/config/dist   ./packages/config/dist
-COPY --from=build /app/apps/api/package.json  ./apps/api/
-COPY --from=build /app/apps/api/dist          ./apps/api/dist
-COPY --from=build /app/apps/api/prisma        ./apps/api/prisma
-COPY --from=build /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
+# Install ALL dependencies (including dev) so that `@prisma/client` ships the
+# generated runtime with enum values, runtime path-mapping helpers
+# (`ts-node`, `tsconfig-paths`) remain available, AND dev tooling like
+# `nest`, `tsc`, `prisma` is on PATH for in-container dev mode.
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+RUN --mount=type=cache,id=pnpm-prod,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
-# Install ONLY production deps. devDependencies are pruned.
-RUN corepack enable && corepack prepare pnpm@9.12.0 --activate \
- && --mount=type=cache,id=pnpm-prod,target=/root/.local/share/pnpm/store \
-    pnpm install --filter @smartlight/api... --prod --frozen-lockfile \
- && pnpm store prune
+# Regenerate Prisma client on Debian so the bundled query engine matches
+# the runtime platform (glibc) instead of musl from the Alpine builder.
+# Run via npx (avoids pnpm's workspace-aware .bin resolution which can
+# hide dev-only bins like `prisma`).
+ENV PRISMA_QUERY_ENGINE_BINARY=auto
+RUN npx --yes prisma@5.22.0 generate --schema=apps/api/prisma/schema.prisma
 
-# Hand off to non-root.
+# Re-link (non-root) ownership
 RUN chown -R smartlight:smartlight /app
 USER smartlight
 
 EXPOSE 4000
-
-# Container-level healthcheck — pings /health which the app exposes.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD curl -fsS http://localhost:4000/health || exit 1
 
-# tini as PID 1 for proper signal handling (SIGTERM/SIGINT).
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "-r", "./apps/api/dist/apps/api/src/register.js", "apps/api/dist/apps/api/src/main.js"]
+ENTRYPOINT ["/usr/bin/tini", "--"] 
+# Default: run dev mode (ts-node handles circular imports cleanly). We use
+# the `dev:tsnode` script so the API doesn't depend on a `nest` CLI binary
+# inside the container — only `ts-node` and `tsconfig-paths`, which are
+# runtime deps of the API.
+WORKDIR /app
+CMD ["sh", "-c", "pnpm --filter @smartlight/api run dev:tsnode"]
 
-# Metadata.
+# Metadata
 LABEL org.opencontainers.image.title="SmartLight API" \
       org.opencontainers.image.description="Enterprise E-Commerce API for SmartLight" \
       org.opencontainers.image.source="https://github.com/smartlight/smartlight" \

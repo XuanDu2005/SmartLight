@@ -36,12 +36,16 @@ RUN apk add --no-cache wget tini \
  && rm -f /etc/nginx/conf.d/default.conf
 
 RUN addgroup -g 1001 smartlight \
- && adduser -S -G smartlight -u 1001 smartlight \
- && touch /var/run/nginx.pid \
- && chown -R smartlight:smartlight /var/cache/nginx /var/log/nginx /var/run/nginx.pid /usr/share/nginx/html
+  && adduser -S -G smartlight -u 1001 smartlight \
+  && touch /var/run/nginx.pid \
+  && chown -R smartlight:smartlight /var/cache/nginx /var/log/nginx /var/run/nginx.pid /usr/share/nginx/html
 
-COPY --from=builder /app/apps/admin/dist /usr/share/nginx/html
+# Build stage leaves dist files owned by root (COPY --from=builder). Re-own
+# everything under nginx's html directory so the non-root `smartlight`
+# user that the runtime drops into can serve assets/index.html.
+COPY --from=builder --chown=smartlight:smartlight /app/apps/admin/dist /usr/share/nginx/html
 COPY infrastructure/nginx/admin.nginx.conf /etc/nginx/conf.d/default.conf
+RUN chown -R smartlight:smartlight /usr/share/nginx/html
 
 USER smartlight
 

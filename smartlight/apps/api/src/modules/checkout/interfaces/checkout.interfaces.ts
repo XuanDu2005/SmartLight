@@ -126,3 +126,4 @@ export interface AddressSnapshot {
 /* ---------- Domain types re-exported ---------- */
 
 export type { CheckoutItem, CheckoutSession, StockReservation };
+

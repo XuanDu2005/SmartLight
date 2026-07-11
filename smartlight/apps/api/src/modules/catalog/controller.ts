@@ -465,3 +465,4 @@ export class CatalogController {
     await this.catalog.deleteAttribute(id);
   }
 }
+

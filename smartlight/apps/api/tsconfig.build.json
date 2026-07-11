@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
+    "outDir": "./dist",
+    "rootDir": "../..",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@smartlight/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@smartlight/shared/*": ["../../packages/shared/dist/*"],
+      "@smartlight/config": ["../../packages/config/dist/config/src/index.d.ts"],
+      "@smartlight/config/*": ["../../packages/config/dist/config/src/*"]
+    },
+    "declaration": false
+  },
+  "include": ["src/**/*", "prisma/**/*.ts", "test/**/*"],
+  "exclude": ["node_modules", "dist", ".turbo", "coverage"]
+}

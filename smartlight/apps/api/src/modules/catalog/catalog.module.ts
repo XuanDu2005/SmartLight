@@ -10,3 +10,4 @@ import { CatalogService } from './service';
   exports: [CatalogService],
 })
 export class CatalogModule {}
+

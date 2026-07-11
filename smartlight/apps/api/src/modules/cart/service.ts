@@ -15,6 +15,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 import { CartRepository } from './repositories/cart.repository';
 import { CART_LIMITS } from './constants/cart.constants';
@@ -50,7 +51,7 @@ import type {
 } from './dto/cart-response.dto';
 import type { CartWithFullItems } from './interfaces/cart.interfaces';
 
-const ZERO = new Prisma.Decimal(0);
+const ZERO = new Decimal(0);
 
 @Injectable()
 export class CartService {
@@ -139,7 +140,7 @@ export class CartService {
         throw new InvalidQuantityException('too_large', targetQty);
       }
 
-      const unitPrice = new Prisma.Decimal(variant.price as any);
+      const unitPrice = new Decimal(variant.price as any);
       const subtotal = unitPrice.mul(targetQty);
       const imageUrl = await this.repo.getPrimaryImageForVariant(dto.variantId);
 
@@ -217,7 +218,7 @@ export class CartService {
         throw new QuantityExceedsStockException(dto.quantity, stock, variant.id);
       }
 
-      const unitPrice = new Prisma.Decimal(item.unitPrice as any);
+      const unitPrice = new Decimal(item.unitPrice as any);
       const subtotal = unitPrice.mul(dto.quantity);
       await tx.cartItem.update({
         where: { id: item.id },
@@ -400,7 +401,7 @@ export class CartService {
             skipped += 1;
             continue;
           }
-          const unitPrice = new Prisma.Decimal(existing.unitPrice as any);
+          const unitPrice = new Decimal(existing.unitPrice as any);
           await tx.cartItem.update({
             where: { id: existing.id },
             data: {
@@ -427,7 +428,7 @@ export class CartService {
             skipped += 1;
             continue;
           }
-          const unitPrice = new Prisma.Decimal(variant.price as any);
+          const unitPrice = new Decimal(variant.price as any);
           const imageUrl = await this.repo.getPrimaryImageForVariant(variant.id);
           await tx.cartItem.create({
             data: {
@@ -614,7 +615,7 @@ export class CartService {
     let totalCount = 0;
 
     for (const item of items) {
-      const lineSubtotal = new Prisma.Decimal(item.subtotal as any);
+      const lineSubtotal = new Decimal(item.subtotal as any);
       subtotal = subtotal.add(lineSubtotal);
       totalCount += 1;
       if (item.isSelected) {
@@ -623,9 +624,9 @@ export class CartService {
       }
     }
 
-    const discountTotal = new Prisma.Decimal((cart.discountTotal as any) ?? 0);
-    const taxTotal = new Prisma.Decimal((cart.taxTotal as any) ?? 0);
-    const shippingTotal = new Prisma.Decimal((cart.shippingTotal as any) ?? 0);
+    const discountTotal = new Decimal((cart.discountTotal as any) ?? 0);
+    const taxTotal = new Decimal((cart.taxTotal as any) ?? 0);
+    const shippingTotal = new Decimal((cart.shippingTotal as any) ?? 0);
     const estimatedShipping = ZERO; // computed at checkout
     const grandTotal = subtotal
       .plus(estimatedShipping)
@@ -776,7 +777,7 @@ export class CartService {
 
   /* ---------- utilities ---------- */
 
-  private d2n(d: Prisma.Decimal | number | null | undefined): number {
+  private d2n(d: Decimal | number | null | undefined): number {
     if (d === null || d === undefined) return 0;
     if (typeof d === 'number') return d;
     return d.toNumber();
@@ -807,3 +808,4 @@ export class CartService {
     };
   }
 }
+

@@ -45,3 +45,4 @@ export class ViettelPostGateway extends BaseShippingGateway {
     return super.verifyCallback(payload, headers);
   }
 }
+

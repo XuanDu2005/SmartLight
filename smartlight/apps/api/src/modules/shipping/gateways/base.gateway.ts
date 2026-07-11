@@ -65,3 +65,4 @@ export abstract class BaseShippingGateway implements ShippingGateway {
 
   abstract estimateFee(input: FeeEstimateInput): Promise<FeeEstimateResult>;
 }
+

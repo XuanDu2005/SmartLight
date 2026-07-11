@@ -1453,3 +1453,4 @@ export class CatalogService {
     }
   }
 }
+

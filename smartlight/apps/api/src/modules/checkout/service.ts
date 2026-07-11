@@ -16,6 +16,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 import { CheckoutRepository } from './repositories/checkout.repository';
 import {
@@ -49,7 +50,7 @@ import type {
   ReservationResponseDto,
 } from './dto/checkout-response.dto';
 
-const ZERO = new Prisma.Decimal(0);
+const ZERO = new Decimal(0);
 
 @Injectable()
 export class CheckoutService {
@@ -181,7 +182,7 @@ export class CheckoutService {
       // 3. Compute totals
       let subtotal = ZERO;
       for (const item of validatedItems) {
-        subtotal = subtotal.add(new Prisma.Decimal(item.price as any).mul(item.quantity));
+        subtotal = subtotal.add(new Decimal(item.price as any).mul(item.quantity));
       }
 
       const session = await tx.checkoutSession.create({
@@ -206,7 +207,7 @@ export class CheckoutService {
         productVariantId: item.variantId,
         quantity: item.quantity,
         unitPriceSnapshot: item.price,
-        lineSubtotalSnapshot: new Prisma.Decimal(item.price as any).mul(item.quantity),
+        lineSubtotalSnapshot: new Decimal(item.price as any).mul(item.quantity),
         taxAmountSnapshot: ZERO,
         productNameSnapshot: item.productName,
         variantNameSnapshot: item.variantName,
@@ -703,7 +704,7 @@ export class CheckoutService {
     };
   }
 
-  private d2n(d: Prisma.Decimal | number | null | undefined): number {
+  private d2n(d: Decimal | number | null | undefined): number {
     if (d === null || d === undefined) return 0;
     if (typeof d === 'number') return d;
     return (d as any).toNumber?.() ?? 0;
@@ -747,3 +748,4 @@ export class CheckoutService {
     } as const;
   }
 }
+

@@ -121,3 +121,4 @@ export interface AdminCheckoutListResponseDto {
   page: number;
   limit: number;
 }
+

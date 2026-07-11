@@ -9,7 +9,7 @@
  * All metrics use a single shared registry so the /metrics endpoint
  * returns one combined payload.
  */
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, forwardRef } from '@nestjs/common';
 import {
   Counter,
   Histogram,
@@ -44,7 +44,7 @@ export class MetricsService implements OnModuleInit {
   readonly paymentsCompletedTotal: Counter<string>;
 
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => PrismaService)) private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {
     // Default Node.js process metrics (memory, CPU, GC, event-loop lag).

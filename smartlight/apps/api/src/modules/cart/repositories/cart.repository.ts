@@ -36,7 +36,7 @@ export class CartRepository {
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     return this.prisma.$transaction(fn, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: 'Serializable',
       timeout: 15_000,
     });
   }
@@ -349,3 +349,4 @@ export class CartRepository {
     return this.fullInclude() as unknown as T;
   }
 }
+

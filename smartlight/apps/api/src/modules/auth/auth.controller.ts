@@ -552,3 +552,4 @@ export class AuthController {
     res.redirect(302, url.toString());
   }
 }
+

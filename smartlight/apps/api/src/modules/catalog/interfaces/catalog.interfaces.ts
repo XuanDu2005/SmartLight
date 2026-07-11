@@ -159,3 +159,4 @@ export interface ProductFilterInput {
   limit?: number;
   attribute?: Record<string, string>;
 }
+

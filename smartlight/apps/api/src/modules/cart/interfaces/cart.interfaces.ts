@@ -98,3 +98,4 @@ export interface ListCartsFilter {
 /* ---------- Domain entities re-exported for convenience ---------- */
 
 export type { CartItem, Coupon, Inventory, Product, ProductVariant };
+

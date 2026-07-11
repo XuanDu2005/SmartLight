@@ -1,8 +1,10 @@
 import {
+  Inject,
   Injectable,
   OnModuleDestroy,
   OnModuleInit,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { MetricsService } from '../metrics/metrics.service';
@@ -25,7 +27,7 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  constructor(@Optional() private readonly metrics?: MetricsService) {
+  constructor(@Optional() @Inject(forwardRef(() => MetricsService)) private readonly metrics?: MetricsService) {
     super();
 
     // Best-effort metrics hook — never let it break queries.

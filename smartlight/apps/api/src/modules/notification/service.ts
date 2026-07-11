@@ -12,6 +12,7 @@
  *   - registerTemplate / updateTemplate / deleteTemplate
  */
 import {
+  forwardRef,
   Inject,
   Injectable,
   Logger,
@@ -62,7 +63,9 @@ export class NotificationService {
   constructor(
     private readonly repo: NotificationRepository,
     @Inject(EMAIL_PROVIDER) private readonly provider: IEmailProvider,
-    @Optional() private readonly processor?: NotificationProcessor,
+    @Optional()
+    @Inject(forwardRef(() => NotificationProcessor))
+    private readonly processor?: NotificationProcessor,
   ) {}
 
   /* ============================================================== */
