@@ -40,6 +40,29 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 COPY packages ./packages
 COPY apps/web ./apps/web
 
+# Build shared/config/ui packages first — they're published as compiled
+# `dist/` (their `package.json` `main` points at `dist/index.js`), so the
+# web code (and tailwind.config.ts which imports `@smartlight/config`)
+# can't resolve them until those dists exist.
+RUN \
+  pnpm --filter @smartlight/shared run build \
+  && pnpm --filter @smartlight/ui run build \
+  && pnpm --filter @smartlight/config run build || true
+
+# The TypeScript build of @smartlight/config emits files at
+# `dist/config/src/*.{js,d.ts}` because of how tsc infers rootDir from
+# the combined input set (sibling workspaces + the package's own src).
+# The package's `package.json#main` advertises `./dist/index.js`, and
+# the emitted code uses relative `require("./env")` calls — so consumers
+# need the entry + sibling files at the top of `dist/`. We canonicalise
+# by copying the nested bundle to `dist/` (and the same for @smartlight/shared).
+RUN \
+  if [ -d /app/packages/config/dist/config/src ]; then \
+    cp -r /app/packages/config/dist/config/src/. /app/packages/config/dist/ && \
+    cp -r /app/packages/shared/dist/shared/src/. /app/packages/shared/dist/ 2>/dev/null || true; \
+  fi
+RUN ls /app/packages/config/dist/ | head -10; echo "---"; ls /app/packages/shared/dist/ | head -10
+
 # Public API base URL is baked into the bundle at build time.
 ARG VITE_API_BASE_URL=http://localhost:4000
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
@@ -73,7 +96,7 @@ RUN chown -R smartlight:smartlight /usr/share/nginx/html
 
 USER smartlight
 
-EXPOSE 5173
+EXPOSE 80
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
   CMD wget -q --spider http://localhost/health || exit 1

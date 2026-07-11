@@ -72,8 +72,10 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    # nginx inside the container listens on :80; we expose that on the host
+    # at 5173 (matches the EXPOSE in Dockerfile.web — Vite's dev port).
     ports:
-      - "5173:5173"
+      - "5173:80"
 
   admin:
     build:
@@ -83,8 +85,9 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    # Same story for the admin container: nginx :80 → host :5174.
     ports:
-      - "5174:5174"
+      - "5174:80"
 
 volumes:
   postgres-data:

@@ -22,8 +22,27 @@ COPY apps/admin/package.json       ./apps/admin/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --filter @smartlight/admin... --frozen-lockfile
 
+# Now copy source.
 COPY packages ./packages
 COPY apps/admin ./apps/admin
+
+RUN \
+  pnpm --filter @smartlight/shared run build \
+  && pnpm --filter @smartlight/ui run build \
+  && pnpm --filter @smartlight/config run build || true
+
+# The TypeScript build of @smartlight/config emits files at
+# `dist/config/src/*.{js,d.ts}` because of how tsc infers rootDir from
+# the combined input set (sibling workspaces + the package's own src).
+# The package's `package.json#main` advertises `./dist/index.js`, and
+# the emitted code uses relative `require("./env")` calls — so consumers
+# need the entry + sibling files at the top of `dist/`. We canonicalise
+# by copying the nested bundle to `dist/`.
+RUN \
+  if [ -d /app/packages/config/dist/config/src ]; then \
+    cp -r /app/packages/config/dist/config/src/. /app/packages/config/dist/; \
+  fi
+RUN ls /app/packages/config/dist/ | head -10
 
 ARG VITE_ADMIN_API_BASE_URL=http://localhost:4000
 ENV VITE_ADMIN_API_BASE_URL=$VITE_ADMIN_API_BASE_URL
@@ -49,7 +68,7 @@ RUN chown -R smartlight:smartlight /usr/share/nginx/html
 
 USER smartlight
 
-EXPOSE 5174
+EXPOSE 80
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
   CMD wget -q --spider http://localhost/health || exit 1
