@@ -1,0 +1,284 @@
+# =============================================================================
+# SmartLight — PRODUCTION docker-compose
+#
+# Topology:
+#
+#   internet  ──►  [nginx]  ──►  /v1/*       ──►  [api]
+#              :80/:443      ──►  /           ──►  [web]   (SPA)
+#                            ──►  /admin/*    ──►  [admin] (SPA)
+#
+# Persistent volumes:
+#   - postgres-data : PostgreSQL data directory
+#   - redis-data    : Redis snapshots
+#   - nginx-cache   : nginx proxy_cache + temp files
+#   - certs         : TLS certificates mounted read-only
+#   - logs          : nginx access/error logs
+#
+# Networks:
+#   - frontend-net : nginx ↔ web / admin (internal only)
+#   - backend-net  : nginx ↔ api (internal only)
+#   - data-net     : api ↔ postgres / redis (internal only)
+#
+# Secrets are read from the host environment (no secrets in the compose file).
+# Use `direnv`, `docker secrets`, or a secrets manager in production.
+# =============================================================================
+
+version: '3.9'
+
+# ---------------------------------------------------------------------------
+# Shared x-anchors — DRY container config
+# ---------------------------------------------------------------------------
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-restart: &default-restart
+  restart: unless-stopped
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  frontend-net:
+    driver: bridge
+    name: smartlight_frontend
+  backend-net:
+    driver: bridge
+    name: smartlight_backend
+  data-net:
+    driver: bridge
+    name: smartlight_data
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  postgres-data:
+    name: smartlight_postgres_data
+    driver: local
+  redis-data:
+    name: smartlight_redis_data
+    driver: local
+  nginx-cache:
+    name: smartlight_nginx_cache
+    driver: local
+  certs:
+    name: smartlight_certs
+    driver: local
+  logs:
+    name: smartlight_logs
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+services:
+  # -----------------------------------------------------------------
+  # PostgreSQL — primary data store
+  # -----------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartlight-postgres
+    <<: *default-restart
+    networks:
+      - data-net
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${POSTGRES_DB:-smartlight}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-smartlight}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # -----------------------------------------------------------------
+  # Redis — cache + BullMQ broker
+  # -----------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: smartlight-redis
+    <<: *default-restart
+    networks:
+      - data-net
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "512mb"
+      - --maxmemory-policy
+      - "allkeys-lru"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  # -----------------------------------------------------------------
+  # API — NestJS modular monolith
+  # -----------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://smartlight.vn}
+    image: smartlight/api:${APP_VERSION:-latest}
+    container_name: smartlight-api
+    <<: *default-restart
+    networks:
+      - data-net
+      - backend-net
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_PORT: 4000
+      API_BASE_URL: ${API_BASE_URL:-https://api.smartlight.vn}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS}
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required}
+      JWT_ACCESS_TTL_SEC: ${JWT_ACCESS_TTL_SEC:-900}
+      JWT_REFRESH_TTL_SEC: ${JWT_REFRESH_TTL_SEC:-604800}
+      THROTTLE_TTL_SEC: ${THROTTLE_TTL_SEC:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
+      ADMIN_BASE_URL: ${ADMIN_BASE_URL}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      FACEBOOK_OAUTH_CLIENT_ID: ${FACEBOOK_OAUTH_CLIENT_ID:-}
+      FACEBOOK_OAUTH_CLIENT_SECRET: ${FACEBOOK_OAUTH_CLIENT_SECRET:-}
+      PAYMENT_VNPAY_TMN_CODE: ${PAYMENT_VNPAY_TMN_CODE:-}
+      PAYMENT_VNPAY_HASH_SECRET: ${PAYMENT_VNPAY_HASH_SECRET:-}
+      PAYMENT_MOMO_PARTNER_CODE: ${PAYMENT_MOMO_PARTNER_CODE:-}
+      PAYMENT_MOMO_ACCESS_KEY: ${PAYMENT_MOMO_ACCESS_KEY:-}
+      PAYMENT_MOMO_SECRET_KEY: ${PAYMENT_MOMO_SECRET_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+        reservations:
+          memory: 512M
+
+  # -----------------------------------------------------------------
+  # Web — customer storefront (nginx serving static SPA)
+  # -----------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://smartlight.vn}
+    image: smartlight/web:${APP_VERSION:-latest}
+    container_name: smartlight-web
+    <<: *default-restart
+    networks:
+      - frontend-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # -----------------------------------------------------------------
+  # Admin — admin SPA (nginx serving static SPA)
+  # -----------------------------------------------------------------
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+      args:
+        VITE_ADMIN_API_BASE_URL: ${VITE_ADMIN_API_BASE_URL:-https://api.smartlight.vn}
+    image: smartlight/admin:${APP_VERSION:-latest}
+    container_name: smartlight-admin
+    <<: *default-restart
+    networks:
+      - frontend-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # -----------------------------------------------------------------
+  # Nginx — TLS-terminating reverse proxy
+  #   Public-facing: 80 → 301 to 443, 443 serves the SPA + /v1 API proxy
+  # -----------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: smartlight-nginx
+    <<: *default-restart
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - frontend-net
+      - backend-net
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infrastructure/nginx/ssl.conf:/etc/nginx/ssl.conf:ro
+      - certs:/etc/nginx/certs:ro
+      - nginx-cache:/var/cache/nginx
+      - logs:/var/log/nginx
+    depends_on:
+      - web
+      - admin
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M

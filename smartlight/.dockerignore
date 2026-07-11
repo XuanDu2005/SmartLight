@@ -1,14 +1,75 @@
+# =============================================================================
+# .dockerignore — keeps the build context small and the build cache clean.
+# Anything listed here is invisible to `docker build`.
+# =============================================================================
+
+# --- Dependencies (reinstalled inside the image) ---
+node_modules
 **/node_modules
+.pnpm-store
+
+# --- Build outputs (produced inside the image) ---
+dist
+build
+.next
+.turbo
+coverage
 **/dist
+**/build
+**/.next
 **/.turbo
-**/.tsbuildinfo
-.git
-.gitignore
+**/coverage
+
+# --- Environment / secrets (NEVER bake into image) ---
 .env
-.env.local
-docs
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Tests ---
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__
+**/__mocks__
+**/jest.config.*
+**/jest-e2e.json
+test
+**/test
+
+# --- IDE / OS noise ---
 .vscode
 .idea
-**/*.log
-coverage
-**/.DS_Store
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# --- Logs / runtime data ---
+*.log
+logs
+docker-data
+.vs
+
+# --- Documentation / project meta ---
+docs
+README.md
+**/README.md
+CHANGELOG.md
+LICENSE
+
+# --- CI / GitHub config ---
+.github
+
+# --- Husky / git hooks ---
+.husky
+.git
+.gitignore
+.gitattributes
+
+# --- Editor screenshots / mockups ---
+*.png
+!packages/ui/src/**/*.png

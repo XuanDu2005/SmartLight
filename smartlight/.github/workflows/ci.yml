@@ -1,0 +1,278 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+# Cancel in-flight runs for the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9.12.0'
+
+jobs:
+  # -----------------------------------------------------------------
+  # 1. Install + cache
+  # -----------------------------------------------------------------
+  install:
+    name: Install (pnpm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Prisma engines
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/prisma
+            apps/api/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('apps/api/prisma/schema.prisma') }}
+          restore-keys: |
+            ${{ runner.os }}-prisma-
+
+      - name: Generate Prisma client
+        run: pnpm --filter @smartlight/api exec prisma generate
+
+      - name: Upload Turbo cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: turbo-cache
+          path: .turbo
+          retention-days: 1
+
+  # -----------------------------------------------------------------
+  # 2. Lint
+  # -----------------------------------------------------------------
+  lint:
+    name: Lint
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  # -----------------------------------------------------------------
+  # 3. Typecheck
+  # -----------------------------------------------------------------
+  typecheck:
+    name: Typecheck
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @smartlight/api exec prisma generate
+      - run: pnpm typecheck
+
+  # -----------------------------------------------------------------
+  # 4. Unit tests (no DB required)
+  # -----------------------------------------------------------------
+  unit-tests:
+    name: Unit tests
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @smartlight/api exec prisma generate
+      - run: pnpm test --filter @smartlight/api
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: apps/api/coverage
+          retention-days: 7
+
+  # -----------------------------------------------------------------
+  # 5. E2E tests (Postgres + Redis service containers)
+  # -----------------------------------------------------------------
+  e2e-tests:
+    name: E2E tests
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: smartlight
+          POSTGRES_PASSWORD: smartlight
+          POSTGRES_DB: smartlight
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U smartlight"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://smartlight:smartlight@localhost:5432/smartlight?schema=public
+      DIRECT_URL: postgresql://smartlight:smartlight@localhost:5432/smartlight?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      LOG_LEVEL: error
+      API_PORT: 4000
+      API_BASE_URL: http://localhost:4000
+      API_CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      JWT_ACCESS_SECRET: ci-test-access-secret-must-be-at-least-32-bytes-long
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-must-be-at-least-32-bytes-long
+      THROTTLE_TTL_SEC: '60'
+      THROTTLE_LIMIT: '1000'
+      FRONTEND_BASE_URL: http://localhost:5173
+      ADMIN_BASE_URL: http://localhost:5174
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @smartlight/api exec prisma migrate deploy
+      - run: pnpm --filter @smartlight/api exec prisma generate
+      - run: pnpm --filter @smartlight/api test:e2e
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-e2e
+          path: apps/api/coverage
+          retention-days: 7
+
+  # -----------------------------------------------------------------
+  # 6. Build (api, web, admin)
+  # -----------------------------------------------------------------
+  build:
+    name: Build
+    needs: [lint, typecheck, unit-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @smartlight/api exec prisma generate
+      - run: pnpm build
+
+  # -----------------------------------------------------------------
+  # 7. Docker build (only on main, after build passes)
+  # -----------------------------------------------------------------
+  docker:
+    name: Docker build
+    needs: [build, e2e-tests]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [api, web, admin]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.target }}-
+      - name: Build Dockerfile.${{ matrix.target }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.${{ matrix.target }}
+          tags: |
+            smartlight/${{ matrix.target }}:${{ github.sha }}
+            smartlight/${{ matrix.target }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+          load: true
+      - name: Smoke test image
+        run: |
+          docker images | grep smartlight/${{ matrix.target }} || true
+          echo "Built smartlight/${{ matrix.target }}:${{ github.sha }}"
+
+  # -----------------------------------------------------------------
+  # 8. Final summary (only shown when any prior job fails)
+  # -----------------------------------------------------------------
+  summary:
+    name: CI summary
+    needs: [lint, typecheck, unit-tests, e2e-tests, build, docker]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print summary
+        run: |
+          echo "❌ CI failed — see job logs for details."
+          echo "Lint:      ${{ needs.lint.result }}"
+          echo "Typecheck: ${{ needs.typecheck.result }}"
+          echo "Unit:      ${{ needs.unit-tests.result }}"
+          echo "E2E:       ${{ needs.e2e-tests.result }}"
+          echo "Build:     ${{ needs.build.result }}"
+          echo "Docker:    ${{ needs.docker.result }}"

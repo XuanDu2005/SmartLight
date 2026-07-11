@@ -1,71 +1,120 @@
 # =============================================================================
-# SmartLight API \u2014 multi-stage Dockerfile
-# Per docs/05-software-architecture/17_DOCKER_ARCHITECTURE.md
-# - Stage 1: builder (dev deps + build)
-# - Stage 2: production runtime (production deps only + dist)
+# SmartLight API — production Dockerfile (multi-stage)
+#
+# Stage 1 (deps)      : install ALL workspace deps (incl. dev) so the api
+#                       can be built and prisma client generated.
+# Stage 2 (build)     : compile NestJS via nest build → apps/api/dist.
+# Stage 3 (runtime)   : install PRODUCTION-ONLY deps (`--prod`) and copy
+#                       the compiled artifact. Drop devDeps and source.
+#
+# BuildKit features used:
+#   - cache mount for pnpm store (faster rebuilds)
+#   - RUN --mount=type=cache for npm/pnpm store
+#
+# Image size target: < 250 MB (alpine + Node 20 + prod deps).
+# Runs as non-root `smartlight` user (UID 1001).
 # =============================================================================
 
-# ---- Stage 1: builder ----
-FROM node:20-alpine AS builder
+# ---------------------------------------------------------------------------
+# Stage 1: deps (full workspace install for building)
+# ---------------------------------------------------------------------------
+FROM node:20-alpine AS deps
+
 WORKDIR /app
 
-# pnpm
+# pnpm via corepack (pinned)
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
-# Copy lockfiles and root manifests first (cache layer)
+# Copy lockfile + workspace metadata first → better layer caching.
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY tsconfig.base.json turbo.json ./
 
-# Copy package.json files of every workspace
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/config/package.json ./packages/config/
+# Only copy package.jsons (no source) for `pnpm install`
+COPY packages/shared/package.json   ./packages/shared/
+COPY packages/config/package.json  ./packages/config/
 COPY packages/ui/package.json      ./packages/ui/
-COPY apps/api/package.json          ./apps/api/
-COPY apps/web/package.json          ./apps/web/
-COPY apps/admin/package.json        ./apps/admin/
+COPY apps/api/package.json         ./apps/api/
+COPY apps/web/package.json         ./apps/web/
+COPY apps/admin/package.json       ./apps/admin/
 
-# Install all dependencies (including dev)
-RUN pnpm install --filter @smartlight/api... --frozen-lockfile || pnpm install --filter @smartlight/api...
+# BuildKit cache mount: keep pnpm store across rebuilds.
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --filter @smartlight/api... --frozen-lockfile
 
-# Generate Prisma client
-COPY apps/api/prisma ./apps/api/prisma
-RUN pnpm --filter @smartlight/api exec prisma generate
+# ---------------------------------------------------------------------------
+# Stage 2: build
+# ---------------------------------------------------------------------------
+FROM deps AS build
 
-# Build sources
-COPY packages ./packages
-COPY apps/api ./apps/api
-RUN pnpm --filter @smartlight/api run build
-
-# ---- Stage 2: runtime ----
-FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Add curl for healthcheck + tini for signal handling
+# Now copy source files needed for build.
+COPY packages ./packages
+COPY apps/api ./apps/api
+
+# Generate Prisma client (debounced by schema hash via BuildKit cache).
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm --filter @smartlight/api exec prisma generate
+
+# Compile.
+RUN pnpm --filter @smartlight/api run build
+
+# ---------------------------------------------------------------------------
+# Stage 3: runtime — production deps only, drop dev deps, run as non-root.
+# ---------------------------------------------------------------------------
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+
+# Minimal runtime tools:
+#   - curl : HEALTHCHECK
+#   - tini : PID 1, signal forwarding, zombie reaping
 RUN apk add --no-cache curl tini
-ENV NODE_ENV=production
-ENV PNPM_HOME=/usr/local/share/pnpm
-ENV PATH=$PNPM_HOME:$PATH
 
-# Non-root user
+ENV NODE_ENV=production \
+    PNPM_HOME=/usr/local/share/pnpm \
+    PATH=/usr/local/share/pnpm:$PATH \
+    API_PORT=4000
+
+# Non-root user (UID/GID 1001 to match Kubernetes runAsUser guidance).
 RUN addgroup -g 1001 smartlight \
-  && adduser -S -G smartlight -u 1001 smartlight
+ && adduser -S -G smartlight -u 1001 smartlight
 
-# Copy built artifacts
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
-COPY --from=builder /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
-COPY --from=builder /app/apps/api/nest-cli.json ./apps/api/nest-cli.json
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+# Copy only the package metadata we need for a fresh prod-only install.
+COPY --from=build /app/package.json            ./package.json
+COPY --from=build /app/pnpm-workspace.yaml    ./pnpm-workspace.yaml
+COPY --from=build /app/pnpm-lock.yaml         ./pnpm-lock.yaml
+COPY --from=build /app/packages/shared/package.json   ./packages/shared/
+COPY --from=build /app/packages/config/package.json  ./packages/config/
+COPY --from=build /app/packages/shared/dist   ./packages/shared/dist
+COPY --from=build /app/packages/config/dist   ./packages/config/dist
+COPY --from=build /app/apps/api/package.json  ./apps/api/
+COPY --from=build /app/apps/api/dist          ./apps/api/dist
+COPY --from=build /app/apps/api/prisma        ./apps/api/prisma
+COPY --from=build /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
 
-# Re-link (non-root) ownership
+# Install ONLY production deps. devDependencies are pruned.
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate \
+ && --mount=type=cache,id=pnpm-prod,target=/root/.local/share/pnpm/store \
+    pnpm install --filter @smartlight/api... --prod --frozen-lockfile \
+ && pnpm store prune
+
+# Hand off to non-root.
 RUN chown -R smartlight:smartlight /app
 USER smartlight
 
 EXPOSE 4000
+
+# Container-level healthcheck — pings /health which the app exposes.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD curl -fsS http://localhost:4000/health || exit 1
 
+# tini as PID 1 for proper signal handling (SIGTERM/SIGINT).
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "-r", "./dist/apps/api/src/register.js", "dist/apps/api/src/main.js"]
+CMD ["node", "-r", "./apps/api/dist/apps/api/src/register.js", "apps/api/dist/apps/api/src/main.js"]
+
+# Metadata.
+LABEL org.opencontainers.image.title="SmartLight API" \
+      org.opencontainers.image.description="Enterprise E-Commerce API for SmartLight" \
+      org.opencontainers.image.source="https://github.com/smartlight/smartlight" \
+      org.opencontainers.image.licenses="UNLICENSED"

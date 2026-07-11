@@ -12,6 +12,9 @@ import { DatabaseModule } from './platform/database/database.module';
 import { RedisModule } from './platform/redis/redis.module';
 import { QueueModule } from './platform/queue/queue.module';
 import { LoggerConfig } from './platform/logger/logger.config';
+import { MetricsModule } from './platform/metrics/metrics.module';
+import { CacheModule } from './platform/cache/cache.module';
+import { HttpMetricsInterceptor } from './platform/metrics/http-metrics.interceptor';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -32,7 +35,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
-import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { GlobalExceptionFilter } from './platform/filters/global-exception.filter';
 
@@ -56,6 +59,8 @@ import { GlobalExceptionFilter } from './platform/filters/global-exception.filte
     DatabaseModule,
     RedisModule,
     QueueModule,
+    MetricsModule,
+    CacheModule,
 
     // Bounded contexts
     AuthModule,
@@ -82,6 +87,8 @@ import { GlobalExceptionFilter } from './platform/filters/global-exception.filte
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Global error envelope
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    // Prometheus HTTP metrics
+    { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
   ],
 })
 export class AppModule {}
