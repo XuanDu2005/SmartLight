@@ -97,7 +97,7 @@ export const RootLayout = (): JSX.Element => {
                       : 'hover:text-smart-700'
                   }
                 >
-                  {user.displayName ?? user.email}
+                  {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
                 </NavLink>
                 <Button
                   size="sm"

@@ -33,6 +33,7 @@ export const AccountPage = (): JSX.Element => {
   useEffect(() => {
     if (!isAuthenticated) return;
     setLoading(true);
+    setErr(null);
     accountApi
       .getMe()
       .then(setProfile)
@@ -64,7 +65,8 @@ export const AccountPage = (): JSX.Element => {
       setProfile(updated);
       toast.push('Đã lưu thông tin', 'success');
     } catch (e) {
-      toast.push(e instanceof Error ? e.message : 'Lỗi', 'error');
+      const msg = e instanceof Error ? e.message : 'Lỗi';
+      toast.push(msg, 'info');
     } finally {
       setSaving(false);
     }

@@ -58,12 +58,25 @@ export class TokenService {
   ) {
     this.accessSecret = this.config.getOrThrow<string>('JWT_ACCESS_SECRET');
     this.refreshSecret = this.config.getOrThrow<string>('JWT_REFRESH_SECRET');
-    this.accessTtlSec = this.config.get<number>('JWT_ACCESS_TTL_SEC', 900);
-    this.refreshTtlSec = this.config.get<number>('JWT_REFRESH_TTL_SEC', 604800);
-    this.rememberMeTtlSec = this.config.get<number>(
+    this.accessTtlSec = this.parseIntConfig('JWT_ACCESS_TTL_SEC', 900);
+    this.refreshTtlSec = this.parseIntConfig('JWT_REFRESH_TTL_SEC', 604800);
+    this.rememberMeTtlSec = this.parseIntConfig(
       'JWT_REMEMBER_ME_TTL_SEC',
       2592000,
     );
+  }
+
+  /**
+   * Read an integer-valued env var. ConfigService returns raw strings when
+   * no schema validator is configured, and `jsonwebtoken` rejects strings
+   * like `'900'` because they have no unit suffix — it silently falls
+   * back to `expiresIn: 0`, producing tokens that expire the moment
+   * they're issued (exp == iat).
+   */
+  private parseIntConfig(key: string, fallback: number): number {
+    const raw = this.config.get<string | number>(key, fallback);
+    const n = typeof raw === 'number' ? raw : parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
   }
 
   signAccess(payload: Omit<AccessTokenClaims, 'iat' | 'exp' | 'iss'>): {
