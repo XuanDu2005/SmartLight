@@ -38,10 +38,10 @@ export const categoriesApi = {
   },
 
   tree: async (): Promise<CategoryTreeNode[]> => {
-    const { data } = await apiClient.get<CategoryTreeNode[]>(
+    const { data } = await apiClient.get<PaginatedEnvelope<CategoryTreeNode>>(
       '/catalog/categories/tree',
     );
-    return data;
+    return Array.isArray(data?.data) ? data.data : [];
   },
 
   get: async (id: string): Promise<Category> => {
