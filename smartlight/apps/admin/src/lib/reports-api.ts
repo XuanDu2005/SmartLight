@@ -15,25 +15,54 @@ import type {
  * module composes reports by fetching data from orders, products,
  * inventory, etc. and shaping it client-side.
  */
-const fetchAll = async <T>(path: string, params: Record<string, unknown>): Promise<T[]> => {
-  const limit = 200;
-  const first = await apiClient.get<{ items: T[]; total: number }>(path, {
+type ListEnvelope<T> = {
+  items?: T[];
+  total?: number;
+  data?: T[];
+  meta?: { pagination?: { totalItems?: number } };
+};
+
+const readList = <T>(raw: unknown): { items: T[]; total: number } => {
+  if (!raw || typeof raw !== 'object') return { items: [], total: 0 };
+  const env = raw as ListEnvelope<T>;
+  const items: T[] = Array.isArray(env.items)
+    ? env.items
+    : Array.isArray(env.data)
+      ? env.data
+      : [];
+  const total: number =
+    typeof env.total === 'number'
+      ? env.total
+      : typeof env.meta?.pagination?.totalItems === 'number'
+        ? env.meta.pagination.totalItems
+        : items.length;
+  return { items, total };
+};
+
+const fetchAll = async <T>(path: string, params: Record<string, unknown> = {}, maxLimit = 200): Promise<T[]> => {
+  const limit = Math.min(maxLimit, 100);
+  const first = await apiClient.get(path, {
     params: { ...params, limit, page: 1 },
   });
-  const total = first.data.total ?? first.data.items.length;
-  if (total <= limit) return first.data.items;
-  const pages = Math.ceil(total / limit);
+  const page1 = readList<T>(first.data);
+  if (page1.total <= limit) return page1.items;
+  const pages = Math.ceil(page1.total / limit);
   const rest = await Promise.all(
     Array.from({ length: pages - 1 }, (_, i) =>
-      apiClient.get<{ items: T[]; total: number }>(path, {
+      apiClient.get(path, {
         params: { ...params, limit, page: i + 2 },
       }),
     ),
   );
   return [
-    ...first.data.items,
-    ...rest.flatMap((r) => r.data.items),
+    ...page1.items,
+    ...rest.flatMap((r) => readList<T>(r.data).items),
   ];
+};
+
+const inDateRange = (iso: string, filters: ReportFilters): boolean => {
+  const t = new Date(iso).getTime();
+  return t >= new Date(filters.from).getTime() && t <= new Date(filters.to).getTime();
 };
 
 export const reportsApi = {
@@ -43,12 +72,10 @@ export const reportsApi = {
       total: { amount: number };
       status: string;
       createdAt: string;
-    }>('/admin/orders', {
-      from: filters.from,
-      to: filters.to,
-    });
+    }>('/admin/orders', {});
+    const inRange = orders.filter((o) => inDateRange(o.createdAt, filters));
     const buckets = new Map<string, RevenueReportRow>();
-    for (const o of orders) {
+    for (const o of inRange) {
       const date = new Date(o.createdAt).toISOString().slice(0, 10);
       const row = buckets.get(date) ?? {
         date,
@@ -73,12 +100,10 @@ export const reportsApi = {
     const orders = await fetchAll<{
       status: string;
       createdAt: string;
-    }>('/admin/orders', {
-      from: filters.from,
-      to: filters.to,
-    });
+    }>('/admin/orders', {});
+    const inRange = orders.filter((o) => inDateRange(o.createdAt, filters));
     const buckets = new Map<string, OrdersReportRow>();
-    for (const o of orders) {
+    for (const o of inRange) {
       const date = new Date(o.createdAt).toISOString().slice(0, 10);
       const row = buckets.get(date) ?? {
         date,
@@ -122,9 +147,11 @@ export const reportsApi = {
 
   inventory: async (): Promise<InventoryReportRow[]> => {
     const rows = await fetchAll<{
-      variantId: string;
+      id: string;
+      productVariantId: string;
       productName: string;
-      variantSku: string;
+      productSlug?: string;
+      sku: string;
       onHand: number;
       reserved: number;
       available: number;
@@ -138,9 +165,9 @@ export const reportsApi = {
             ? 'LOW'
             : 'OK';
       return {
-        variantId: r.variantId,
+        variantId: r.productVariantId ?? r.id,
         productName: r.productName,
-        sku: r.variantSku,
+        sku: r.sku,
         onHand: r.onHand,
         reserved: r.reserved,
         available: r.available,
