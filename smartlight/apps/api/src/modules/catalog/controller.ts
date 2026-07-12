@@ -221,6 +221,24 @@ export class CatalogController {
   //  ADMIN — Categories
   // =============================================================================
 
+  @Get('admin/catalog/categories')
+  @Roles('admin', 'catalog_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: paginated category list (search + filter)' })
+  async listCategoriesAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.catalog.listCategoriesAdmin({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search || undefined,
+      isActive: status === 'ACTIVE' ? true : status === 'DRAFT' ? false : undefined,
+    });
+  }
+
   @Post('admin/catalog/categories')
   @Roles('admin', 'catalog_manager')
   @HttpCode(HttpStatus.CREATED)
@@ -262,6 +280,24 @@ export class CatalogController {
   // =============================================================================
   //  ADMIN — Brands
   // =============================================================================
+
+  @Get('admin/catalog/brands')
+  @Roles('admin', 'catalog_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: paginated brand list (search + filter)' })
+  async listBrandsAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.catalog.listBrandsAdmin({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search || undefined,
+      isActive: status === 'ACTIVE' ? true : status === 'INACTIVE' ? false : undefined,
+    });
+  }
 
   @Post('admin/catalog/brands')
   @Roles('admin', 'catalog_manager')

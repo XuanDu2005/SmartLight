@@ -156,6 +156,67 @@ export class CatalogService {
     return { data, meta: {} };
   }
 
+  async listCategoriesAdmin(opts: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    isActive?: boolean;
+  }): Promise<{
+    data: CategoryResponseDto[];
+    meta: { pagination: { page: number; limit: number; totalItems: number; totalPages: number; hasNext: boolean; hasPrev: boolean; nextPage: number | null; prevPage: number | null } };
+  }> {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.max(1, Math.min(200, opts.limit ?? 20));
+    const where: Prisma.CategoryWhereInput = { deletedAt: null };
+    if (opts.isActive !== undefined) where.status = (opts.isActive ? 'ACTIVE' : 'DRAFT') as any;
+    if (opts.search) {
+      where.OR = [
+        { name: { contains: opts.search, mode: 'insensitive' } },
+        { slug: { contains: opts.search, mode: 'insensitive' } },
+      ];
+    }
+    const [rows, totalItems] = await Promise.all([
+      this.prisma.category.findMany({ where, orderBy: { displayOrder: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.category.count({ where }),
+    ]);
+    const ids = rows.map((r) => r.id);
+    const counts = await this.prisma.product.groupBy({ by: ['categoryId'], where: { categoryId: { in: ids }, deletedAt: null }, _count: { id: true } });
+    const countMap = new Map(counts.map((c) => [c.categoryId, c._count.id]));
+    const data: CategoryResponseDto[] = rows.map((r) => ({
+      id: r.id,
+      parentId: r.parentId,
+      name: r.name,
+      slug: r.slug,
+      description: r.description,
+      displayOrder: r.displayOrder,
+      level: r.level,
+      isActive: r.status === 'ACTIVE',
+      productCount: countMap.get(r.id) ?? 0,
+      imageUrl: null,
+      isFeatured: r.isFeatured,
+      metaTitle: r.metaTitle,
+      metaDesc: r.metaDesc,
+      createdAt: dt2s(r.createdAt)!,
+      updatedAt: dt2s(r.updatedAt)!,
+    }));
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+    return {
+      data,
+      meta: {
+        pagination: {
+          page,
+          limit,
+          totalItems,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+          nextPage: page < totalPages ? page + 1 : null,
+          prevPage: page > 1 ? page - 1 : null,
+        },
+      },
+    };
+  }
+
   async getCategoryTree(): Promise<{ data: CategoryTreeNodeDto[] }> {
     const rows = await this.prisma.category.findMany({
       where: { deletedAt: null, status: CategoryStatus.ACTIVE as any },
@@ -414,6 +475,94 @@ export class CatalogService {
     }));
 
     return { data };
+  }
+
+  /**
+   * Admin: paginated, searchable brand list. Returns the standard
+   * `{ data, meta.pagination }` envelope consumed by the admin UI's
+   * `unwrapPaginated` helper.
+   */
+  async listBrandsAdmin(opts: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    isActive?: boolean;
+  }): Promise<{
+    data: BrandResponseDto[];
+    meta: {
+      pagination: {
+        page: number;
+        limit: number;
+        totalItems: number;
+        totalPages: number;
+        hasNext: boolean;
+        hasPrev: boolean;
+        nextPage: number | null;
+        prevPage: number | null;
+      };
+    };
+  }> {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.max(1, Math.min(100, opts.limit ?? 20));
+
+    const where: Prisma.BrandWhereInput = { deletedAt: null };
+    if (opts.isActive !== undefined) {
+      where.status = (opts.isActive ? 'ACTIVE' : 'INACTIVE') as any;
+    }
+    if (opts.search) {
+      where.OR = [
+        { name: { contains: opts.search, mode: 'insensitive' } },
+        { slug: { contains: opts.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [rows, totalItems] = await Promise.all([
+      this.prisma.brand.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.brand.count({ where }),
+    ]);
+
+    const ids = rows.map((r) => r.id);
+    const counts = await this.prisma.product.groupBy({
+      by: ['brandId'],
+      where: { brandId: { in: ids }, deletedAt: null },
+      _count: { id: true },
+    });
+    const countMap = new Map(counts.map((c) => [c.brandId as string, c._count.id]));
+
+    const data: BrandResponseDto[] = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      description: r.description,
+      logo: null,
+      isActive: r.status === 'ACTIVE',
+      productCount: countMap.get(r.id) ?? 0,
+      isFeatured: r.isFeatured,
+      createdAt: dt2s(r.createdAt)!,
+      updatedAt: dt2s(r.updatedAt)!,
+    }));
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+    return {
+      data,
+      meta: {
+        pagination: {
+          page,
+          limit,
+          totalItems,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+          nextPage: page < totalPages ? page + 1 : null,
+          prevPage: page > 1 ? page - 1 : null,
+        },
+      },
+    };
   }
 
   async getBrandById(id: string): Promise<BrandResponseDto> {
