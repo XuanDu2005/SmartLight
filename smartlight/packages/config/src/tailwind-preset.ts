@@ -43,6 +43,7 @@ export const brandColors = {
 };
 
 export const smartlightPreset: Partial<Config> = {
+  darkMode: 'class',
   content: [],
   theme: {
     extend: {
