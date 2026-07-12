@@ -400,6 +400,56 @@ export class AuthController {
     return { status: 'mfa_not_implemented' };
   }
 
+  @Public()
+  @UseGuards(JwtRefreshGuard)
+  @Post('admin/refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('sl_refresh')
+  @ApiOperation({
+    summary: 'Rotate admin refresh token',
+    description:
+      'Exchanges a valid admin refresh token (cookie or body) for a new access+refresh pair.',
+  })
+  @ApiResponse({ status: 200, description: 'Admin token pair issued' })
+  @ApiResponse({ status: 401, description: 'Refresh token invalid or expired' })
+  async adminRefresh(
+    @Body() dto: RefreshDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AdminTokenPairResponseDto> {
+    const raw =
+      dto.refreshToken ??
+      (req.cookies?.[AUTH_CONSTANTS.REFRESH_COOKIE_NAME] as string | undefined);
+    if (!raw) {
+      throw new UnauthorizedException('Refresh token missing');
+    }
+    const claims = req.user as unknown as RefreshTokenClaims;
+    if (claims.audience !== 'smartlight.admin') {
+      throw new UnauthorizedException('Not an admin refresh token');
+    }
+    const meta = AuthService.deviceMetaFrom(req, dto.deviceName);
+    const result = (await this.auth.refresh(claims, raw, meta)) as AdminTokenPairResponseDto;
+    this.setAuthCookies(res, result.refreshToken, result.accessToken);
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('admin/logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Logout the current admin session' })
+  @ApiResponse({ status: 204, description: 'Admin session revoked' })
+  async adminLogout(
+    @CurrentUser() user: UserPrincipal,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    if (user.audience !== 'smartlight.admin') {
+      throw new UnauthorizedException('Not an admin session');
+    }
+    await this.auth.logout(user);
+    this.clearAuthCookies(res);
+  }
+
   // ===========================================================================
   //  OAuth
   // ===========================================================================
