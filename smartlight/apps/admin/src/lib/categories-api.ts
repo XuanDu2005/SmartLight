@@ -1,9 +1,10 @@
-import { apiClient } from './api-client';
+import { apiClient, unwrapPaginated } from './api-client';
 import type {
   Category,
   CategoryTreeNode,
   CreateCategoryDto,
   Paginated,
+  PaginatedEnvelope,
   UpdateCategoryDto,
 } from './types';
 
@@ -19,21 +20,21 @@ export const categoriesApi = {
   list: async (
     params: ListCategoriesQuery = {},
   ): Promise<Paginated<Category>> => {
-    const { data } = await apiClient.get<Paginated<Category>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<Category>>(
       '/admin/catalog/categories',
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   listPublic: async (
     params: { page?: number; limit?: number; search?: string } = {},
   ): Promise<Paginated<Category>> => {
-    const { data } = await apiClient.get<Paginated<Category>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<Category>>(
       '/catalog/categories',
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   tree: async (): Promise<CategoryTreeNode[]> => {

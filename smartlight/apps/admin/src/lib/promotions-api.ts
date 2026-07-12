@@ -1,8 +1,9 @@
-import { apiClient } from './api-client';
+import { apiClient, unwrapPaginated } from './api-client';
 import type {
   CreatePromotionDto,
   CreateVoucherDto,
   Paginated,
+  PaginatedEnvelope,
   Promotion,
   PromotionStatus,
   UpdatePromotionDto,
@@ -22,11 +23,11 @@ export const promotionsApi = {
   listAdmin: async (
     params: ListPromotionsParams = {},
   ): Promise<Paginated<Promotion>> => {
-    const { data } = await apiClient.get<Paginated<Promotion>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<Promotion>>(
       '/admin/promotions',
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   getAdmin: async (id: string): Promise<Promotion> => {
@@ -75,11 +76,11 @@ export const promotionsApi = {
   listVouchers: async (
     promotionId: string,
   ): Promise<Paginated<Voucher>> => {
-    const { data } = await apiClient.get<Paginated<Voucher>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<Voucher>>(
       `/admin/promotions/${promotionId}/vouchers`,
       { params: { limit: 100 } },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   createVoucher: async (dto: CreateVoucherDto): Promise<Voucher> => {

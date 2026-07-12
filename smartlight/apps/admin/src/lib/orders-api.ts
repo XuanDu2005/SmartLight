@@ -1,8 +1,9 @@
-import { apiClient } from './api-client';
+import { apiClient, unwrapPaginated } from './api-client';
 import type {
   ListOrdersAdminParams,
   Order,
   Paginated,
+  PaginatedEnvelope,
   UpdateOrderStatusDto,
 } from './types';
 
@@ -10,10 +11,10 @@ export const ordersApi = {
   listAdmin: async (
     params: ListOrdersAdminParams = {},
   ): Promise<Paginated<Order>> => {
-    const { data } = await apiClient.get<Paginated<Order>>('/admin/orders', {
+    const { data } = await apiClient.get<PaginatedEnvelope<Order>>('/admin/orders', {
       params,
     });
-    return data;
+    return unwrapPaginated(data);
   },
 
   getAdmin: async (id: string): Promise<Order> => {

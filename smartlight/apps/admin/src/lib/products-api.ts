@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiClient, unwrapPaginated } from './api-client';
 import type {
   BrandRef,
   CategoryRef,
@@ -7,6 +7,7 @@ import type {
   ListProductsAdminParams,
   MoneyAmount,
   Paginated,
+  PaginatedEnvelope,
   ProductDetail,
   ProductSummary,
   ProductVariant,
@@ -68,11 +69,11 @@ export const productsApi = {
   listAdmin: async (
     params: ListProductsAdminParams = {},
   ): Promise<Paginated<ProductSummary>> => {
-    const { data } = await apiClient.get<Paginated<ProductSummary>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<ProductSummary>>(
       '/admin/catalog/products',
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   getAdmin: async (id: string): Promise<ProductDetail> => {

@@ -4,6 +4,7 @@
  * can set different `baseURL`/tokens without interfering.
  */
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import type { Paginated, PaginatedEnvelope } from './types';
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:4000';
@@ -119,6 +120,24 @@ export const createApiClient = (): AxiosInstance => {
 };
 
 export const apiClient = createApiClient();
+
+/**
+ * Unwrap the server's `{ data, meta.pagination }` envelope into the legacy
+ * `Paginated<T>` view (`{ items, total, page, limit }`) so existing pages
+ * can keep reading `result.items.length` / `result.total` without changes.
+ */
+export function unwrapPaginated<T>(
+  envelope: PaginatedEnvelope<T>,
+): Paginated<T> {
+  const data = Array.isArray(envelope?.data) ? envelope.data : [];
+  const meta = envelope?.meta?.pagination;
+  return {
+    items: data,
+    total: meta?.totalItems ?? data.length,
+    page: meta?.page ?? 1,
+    limit: meta?.limit ?? data.length,
+  };
+}
 
 export const setAccessToken = (token: string): void => {
   localStorage.setItem('smartlight.admin.access', token);

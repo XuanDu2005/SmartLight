@@ -8,6 +8,32 @@
 //  Common
 // ===========================================================================
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+export interface PaginatedEnvelope<T> {
+  data: T[];
+  meta?: {
+    pagination?: PaginationMeta;
+    filters?: Record<string, unknown>;
+    sort?: Array<{ field: string; order: 'asc' | 'desc' }>;
+  };
+}
+
+/**
+ * Convenience view matching the old `{ items, total, page, limit }` shape
+ * so existing pages don't have to be rewritten when consuming a paginated
+ * endpoint. Built from the `{ data, meta.pagination }` envelope returned
+ * by all list endpoints.
+ */
 export interface Paginated<T> {
   items: T[];
   total: number;

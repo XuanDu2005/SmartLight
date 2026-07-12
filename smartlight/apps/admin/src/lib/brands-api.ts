@@ -1,5 +1,11 @@
-import { apiClient } from './api-client';
-import type { Brand, CreateBrandDto, Paginated, UpdateBrandDto } from './types';
+import { apiClient, unwrapPaginated } from './api-client';
+import type {
+  Brand,
+  CreateBrandDto,
+  Paginated,
+  PaginatedEnvelope,
+  UpdateBrandDto,
+} from './types';
 
 export interface ListBrandsQuery {
   page?: number;
@@ -10,20 +16,20 @@ export interface ListBrandsQuery {
 
 export const brandsApi = {
   list: async (params: ListBrandsQuery = {}): Promise<Paginated<Brand>> => {
-    const { data } = await apiClient.get<Paginated<Brand>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<Brand>>(
       '/admin/catalog/brands',
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   listPublic: async (
     params: { page?: number; limit?: number; search?: string } = {},
   ): Promise<Paginated<Brand>> => {
-    const { data } = await apiClient.get<Paginated<Brand>>('/catalog/brands', {
+    const { data } = await apiClient.get<PaginatedEnvelope<Brand>>('/catalog/brands', {
       params,
     });
-    return data;
+    return unwrapPaginated(data);
   },
 
   get: async (id: string): Promise<Brand> => {

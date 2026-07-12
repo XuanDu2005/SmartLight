@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiClient, unwrapPaginated } from './api-client';
 import type {
   BulkAdjustmentDto,
   ImportStockDto,
@@ -6,6 +6,7 @@ import type {
   InventoryStock,
   ListMovementsParams,
   Paginated,
+  PaginatedEnvelope,
   StockMovement,
   UpdateThresholdDto,
 } from './types';
@@ -14,11 +15,11 @@ export const inventoryApi = {
   list: async (
     params: InventoryListParams = {},
   ): Promise<Paginated<InventoryStock>> => {
-    const { data } = await apiClient.get<Paginated<InventoryStock>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<InventoryStock>>(
       '/admin/inventory',
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   get: async (variantId: string): Promise<InventoryStock> => {
@@ -56,11 +57,11 @@ export const inventoryApi = {
     variantId: string,
     params: ListMovementsParams = {},
   ): Promise<Paginated<StockMovement>> => {
-    const { data } = await apiClient.get<Paginated<StockMovement>>(
+    const { data } = await apiClient.get<PaginatedEnvelope<StockMovement>>(
       `/admin/inventory/${variantId}/movements`,
       { params },
     );
-    return data;
+    return unwrapPaginated(data);
   },
 
   import: async (

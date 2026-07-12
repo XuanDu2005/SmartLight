@@ -3,6 +3,7 @@ import { ToastProvider } from '@smartlight/ui';
 
 import { AuthProvider } from './contexts/auth-context';
 import { RootLayout } from './layouts/root-layout';
+import { ErrorBoundary } from './components/error-boundary';
 import { RequireAuth } from './components/require-auth';
 import { HomePage } from './pages/home-page';
 import { ProductsPage } from './pages/products-page';
@@ -22,9 +23,10 @@ import { NotFoundPage } from './pages/not-found-page';
  * Customer storefront router.
  */
 export const App = (): JSX.Element => (
-  <ToastProvider>
-    <AuthProvider>
-      <Routes>
+  <ErrorBoundary>
+    <ToastProvider>
+      <AuthProvider>
+        <Routes>
         <Route element={<RootLayout />}>
           <Route index element={<HomePage />} />
           <Route path="/products" element={<ProductsPage />} />
@@ -68,7 +70,8 @@ export const App = (): JSX.Element => (
           />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
-      </Routes>
-    </AuthProvider>
-  </ToastProvider>
+</Routes>
+      </AuthProvider>
+    </ToastProvider>
+  </ErrorBoundary>
 );
