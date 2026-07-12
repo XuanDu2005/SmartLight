@@ -89,6 +89,24 @@ services:
     ports:
       - "5174:80"
 
+  # Lightweight web UI for Postgres — handy during local development.
+  # Login: System=PostgreSQL, Server=postgres, Username=smartlight,
+  # Password=smartlight_dev_password, Database=smartlight.
+  adminer:
+    image: adminer:latest
+    container_name: smartlight-adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark
+      ADMINER_PLUGINS: \
+        tables-filter
+    ports:
+      - "8080:8080"
+
 volumes:
   postgres-data:
     driver: local
