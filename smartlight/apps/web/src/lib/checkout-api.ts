@@ -1,5 +1,8 @@
 /**
  * Checkout API client — wraps /v1/checkout/* endpoints.
+ *
+ * Backend returns raw DTOs (no `{ data: ... }` wrapper), matching axios
+ * `AxiosResponse<T>` semantics where `res.data` IS the payload.
  */
 import { apiClient } from './api-client';
 
@@ -37,45 +40,45 @@ export interface CheckoutSessionDto {
 
 export const checkoutApi = {
   async createSession(idempotencyKey?: string): Promise<CheckoutSessionDto> {
-    const res = await apiClient.post<{ data: CheckoutSessionDto }>('/checkout', {
+    const res = await apiClient.post<CheckoutSessionDto>('/checkout', {
       idempotencyKey,
     });
-    return res.data.data;
+    return res.data;
   },
 
   async getSession(id: string): Promise<CheckoutSessionDto> {
-    const res = await apiClient.get<{ data: CheckoutSessionDto }>(`/checkout/${id}`);
-    return res.data.data;
+    const res = await apiClient.get<CheckoutSessionDto>(`/checkout/${id}`);
+    return res.data;
   },
 
   async updateAddress(id: string, address: CheckoutAddress): Promise<CheckoutSessionDto> {
-    const res = await apiClient.put<{ data: CheckoutSessionDto }>(
+    const res = await apiClient.post<CheckoutSessionDto>(
       `/checkout/${id}/address`,
       address,
     );
-    return res.data.data;
+    return res.data;
   },
 
   async reserveInventory(id: string): Promise<CheckoutSessionDto> {
-    const res = await apiClient.post<{ data: CheckoutSessionDto }>(
+    const res = await apiClient.post<CheckoutSessionDto>(
       `/checkout/${id}/reserve`,
       {},
     );
-    return res.data.data;
+    return res.data;
   },
 
   async applyCoupon(id: string, code: string): Promise<CheckoutSessionDto> {
-    const res = await apiClient.post<{ data: CheckoutSessionDto }>(
+    const res = await apiClient.post<CheckoutSessionDto>(
       `/checkout/${id}/coupon`,
       { code },
     );
-    return res.data.data;
+    return res.data;
   },
 
   async removeCoupon(id: string): Promise<CheckoutSessionDto> {
-    const res = await apiClient.delete<{ data: CheckoutSessionDto }>(
+    const res = await apiClient.delete<CheckoutSessionDto>(
       `/checkout/${id}/coupon`,
     );
-    return res.data.data;
+    return res.data;
   },
 };

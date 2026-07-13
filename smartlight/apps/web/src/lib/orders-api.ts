@@ -1,5 +1,7 @@
 /**
  * Orders API client — wraps /v1/orders/* endpoints.
+ *
+ * Backend returns raw DTOs (no `{ data: ... }` wrapper).
  */
 import { apiClient } from './api-client';
 
@@ -77,25 +79,29 @@ export interface OrderDto {
 
 export const ordersApi = {
   async listMyOrders(): Promise<OrderSummary[]> {
-    const res = await apiClient.get<{ data: OrderSummary[] }>('/orders');
-    return res.data.data ?? [];
+    const res = await apiClient.get<{ items: OrderSummary[] } | OrderSummary[]>('/orders');
+    const body: any = res.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray((body as any).items)) return (body as any).items;
+    if (body && Array.isArray((body as any).data)) return (body as any).data;
+    return [];
   },
 
   async getOrder(id: string): Promise<OrderDto> {
-    const res = await apiClient.get<{ data: OrderDto }>(`/orders/${id}`);
-    return res.data.data;
+    const res = await apiClient.get<OrderDto>(`/orders/${id}`);
+    return res.data;
   },
 
   async createFromCheckout(checkoutSessionId: string, customerNotes?: string): Promise<OrderDto> {
-    const res = await apiClient.post<{ data: OrderDto }>('/orders', {
+    const res = await apiClient.post<OrderDto>('/orders', {
       checkoutSessionId,
       customerNotes,
     });
-    return res.data.data;
+    return res.data;
   },
 
   async cancelOrder(id: string, reason?: string): Promise<OrderDto> {
-    const res = await apiClient.post<{ data: OrderDto }>(`/orders/${id}/cancel`, { reason });
-    return res.data.data;
+    const res = await apiClient.post<OrderDto>(`/orders/${id}/cancel`, { reason });
+    return res.data;
   },
 };

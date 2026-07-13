@@ -86,7 +86,7 @@ export const cartApi = {
   },
 
   async clear(): Promise<CartDto> {
-    const res = await apiClient.post<CartDto>('/cart/clear');
+    const res = await apiClient.delete<CartDto>('/cart/clear');
     return res.data;
   },
 };

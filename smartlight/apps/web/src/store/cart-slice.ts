@@ -28,8 +28,8 @@ export const fetchCart = createAsyncThunk('cart/fetch', async () => cartApi.getC
 export const addCartItem = createAsyncThunk(
   'cart/addItem',
   async (input: { variantId: string; quantity: number }, { dispatch }) => {
-    // The POST /cart/items response omits `items` (server-side bug),
-    // so we ignore it and refetch the canonical cart from GET /cart.
+    // Always refetch the canonical cart from GET /cart after add to keep
+    // `selectedItemCount` and `cart.itemCount` consistent with `items`.
     await cartApi.addItem(input);
     return dispatch(fetchCart()).unwrap();
   },
