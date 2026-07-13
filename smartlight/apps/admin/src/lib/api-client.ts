@@ -139,6 +139,48 @@ export function unwrapPaginated<T>(
   };
 }
 
+/**
+ * Read a list of items out of any response shape the API might return:
+ * - New `{ data: T[], meta.pagination.totalItems }`
+ * - Old `{ items: T[], total }`
+ * - Bare `T[]`
+ *
+ * Returns `{ items, total }`. Use this in callers that fetch raw axios
+ * responses without going through `unwrapPaginated`.
+ */
+export function readList<T>(raw: unknown): { items: T[]; total: number } {
+  if (Array.isArray(raw)) {
+    return { items: raw as T[], total: (raw as unknown[]).length };
+  }
+  if (raw && typeof raw === 'object') {
+    const env = raw as {
+      items?: T[];
+      total?: number;
+      data?: T[];
+      meta?: { pagination?: { totalItems?: number } };
+    };
+    const items: T[] = Array.isArray(env.items)
+      ? env.items
+      : Array.isArray(env.data)
+        ? env.data
+        : [];
+    const total: number =
+      typeof env.total === 'number'
+        ? env.total
+        : typeof env.meta?.pagination?.totalItems === 'number'
+          ? env.meta.pagination.totalItems
+          : items.length;
+    return { items, total };
+  }
+  return { items: [], total: 0 };
+}
+
+/**
+ * Server-side cap for paginated `?limit=` query params. Any value above
+ * this triggers ValidationPipe 400 in the API, so callers should clamp.
+ */
+export const MAX_LIST_LIMIT = 100;
+
 export const setAccessToken = (token: string): void => {
   localStorage.setItem('smartlight.admin.access', token);
 };
