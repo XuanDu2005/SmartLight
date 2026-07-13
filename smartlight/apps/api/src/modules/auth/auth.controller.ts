@@ -95,13 +95,21 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<RegisterResponseDto> {
     const meta = AuthService.deviceMetaFrom(req);
-    const { user } = await this.auth.register(dto, meta);
+    const { user, verificationToken } = await this.auth.register(dto, meta);
     const projection = await this.auth.users.findById(user.id);
-    return {
+
+    const isDev = process.env.NODE_ENV !== 'production';
+    const response: RegisterResponseDto = {
       user: this.auth.users.toResponseDto(projection!),
       emailVerificationSent: true,
       autoLogin: false,
     };
+    // In development / preview, surface the token so devs can verify accounts
+    // without a live email service.
+    if (isDev && verificationToken) {
+      response.devVerificationToken = verificationToken;
+    }
+    return response;
   }
 
   @Public()

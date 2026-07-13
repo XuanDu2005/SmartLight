@@ -88,6 +88,7 @@ export class AuthService {
   ): Promise<{
     user: User;
     emailVerificationSent: boolean;
+    verificationToken: string;
   }> {
     const normalizedEmail = input.email.trim().toLowerCase();
 
@@ -123,6 +124,7 @@ export class AuthService {
     return {
       user,
       emailVerificationSent: true,
+      verificationToken,
     };
   }
 

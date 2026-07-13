@@ -74,6 +74,7 @@ export const RegisterPage = (): JSX.Element => {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [devToken, setDevToken] = useState<string | null>(null);
 
   const pwChecks = useMemo(() => checkPassword(password), [password]);
   const pwStrong = useMemo(() => isStrongEnough(password), [password]);
@@ -134,16 +135,18 @@ export const RegisterPage = (): JSX.Element => {
           }),
         },
       );
+      const body = (await res.json().catch(() => null)) as
+        | {
+            error?: {
+              code?: string;
+              message?: string;
+              fieldErrors?: Array<{ field?: string; message?: string }>;
+            };
+            devVerificationToken?: string;
+          }
+        | null;
+
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as
-          | {
-              error?: {
-                code?: string;
-                message?: string;
-                fieldErrors?: Array<{ field?: string; message?: string }>;
-              };
-            }
-          | null;
         const fieldErrors = body?.error?.fieldErrors ?? [];
         const detail =
           fieldErrors.length > 0
@@ -176,7 +179,15 @@ export const RegisterPage = (): JSX.Element => {
           res.status,
         );
       }
-      toast.push('Đăng ký thành công! Vui lòng đăng nhập.', 'success');
+
+      toast.push(
+        'Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.',
+        'success',
+      );
+      if (typeof body?.devVerificationToken === 'string') {
+        setDevToken(body.devVerificationToken);
+        return;
+      }
       navigate('/login', { replace: true });
     } catch (e) {
       if (e instanceof ApiError) setErr(e.message);
@@ -190,6 +201,58 @@ export const RegisterPage = (): JSX.Element => {
     <section className="container-page py-12">
       <div className="mx-auto max-w-md">
         <Card>
+          {devToken && (
+            <div className="mx-4 mt-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4 text-sm">
+              <p className="mb-2 font-semibold text-amber-800">
+                Dev Mode — Xác minh email thủ công
+              </p>
+              <p className="mb-3 text-amber-700">
+                Copy token bên dưới và verify tài khoản để đăng nhập:
+              </p>
+              <div className="mb-3 flex items-center gap-2 rounded bg-white px-3 py-2 font-mono text-xs text-neutral-800">
+                <span className="flex-1 break-all">{devToken}</span>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(devToken)}
+                  className="shrink-0 rounded bg-amber-200 px-2 py-1 text-xs hover:bg-amber-300"
+                >
+                  Copy
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(
+                      `${
+                        import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
+                      }/v1/auth/verify-email`,
+                      {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: devToken }),
+                      },
+                    );
+                    if (res.ok) {
+                      toast.push(
+                        'Đã xác minh! Giờ bạn có thể đăng nhập.',
+                        'success',
+                      );
+                      setDevToken(null);
+                      navigate('/login', { replace: true });
+                    } else {
+                      toast.push('Verify thất bại. Thử lại.', 'error');
+                    }
+                  } catch {
+                    toast.push('Lỗi mạng. Thử lại.', 'error');
+                  }
+                }}
+                className="w-full rounded bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+              >
+                Xác minh &amp; đăng nhập
+              </button>
+            </div>
+          )}
           <CardHeader>
             <div>
               <CardTitle>Tạo tài khoản</CardTitle>

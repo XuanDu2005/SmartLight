@@ -45,6 +45,8 @@ export interface LogoutAllResponseDto {
 export interface RegisterResponseDto {
   user: UserResponseDto;
   emailVerificationSent: boolean;
+  /** Only present in non-production environments so developers can verify accounts without an email service. */
+  devVerificationToken?: string;
   autoLogin: false;
 }
 
