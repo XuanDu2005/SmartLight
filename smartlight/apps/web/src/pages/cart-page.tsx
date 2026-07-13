@@ -87,24 +87,24 @@ export const CartPage = (): JSX.Element => {
             {cart.items.map((item: CartItemDto) => (
               <li key={item.id} className="flex items-center gap-4 p-4">
                 <Link
-                  to={`/products/${item.product.slug}`}
+                  to={`/products/${item.productSlug}`}
                   className="h-20 w-20 flex-shrink-0"
                 >
                   <SmartImage
-                    src={item.variant.imageUrl}
-                    alt={item.product.name}
+                    src={item.imageUrl}
+                    alt={item.productName}
                     aspectRatio="square"
                   />
                 </Link>
                 <div className="flex-1">
                   <Link
-                    to={`/products/${item.product.slug}`}
+                    to={`/products/${item.productSlug}`}
                     className="text-sm font-medium text-neutral-900 hover:text-smart-700"
                   >
-                    {item.product.name}
+                    {item.productName}
                   </Link>
                   <div className="text-xs text-neutral-500">
-                    {item.variant.name} · SKU: {item.variant.sku}
+                    {item.variantName} · SKU: {item.sku}
                   </div>
                   <div className="mt-1 text-sm font-medium text-smart-700">
                     {formatVND(item.unitPrice)}
@@ -124,7 +124,7 @@ export const CartPage = (): JSX.Element => {
                   />
                 </FormField>
                 <div className="w-28 text-right text-sm font-semibold text-neutral-900">
-                  {formatVND(item.lineSubtotal)}
+                  {formatVND(item.subtotal)}
                 </div>
                 <Button
                   size="sm"
@@ -151,10 +151,10 @@ export const CartPage = (): JSX.Element => {
                 <dt className="text-neutral-500">Tạm tính</dt>
                 <dd>{formatVND(cart.totals.subtotal)}</dd>
               </div>
-              {cart.totals.discountAmount > 0 && (
+              {cart.totals.discountTotal > 0 && (
                 <div className="flex justify-between text-green-700">
                   <dt>Giảm giá</dt>
-                  <dd>-{formatVND(cart.totals.discountAmount)}</dd>
+                  <dd>-{formatVND(cart.totals.discountTotal)}</dd>
                 </div>
               )}
               <div className="flex justify-between border-t border-neutral-100 pt-2 text-base font-semibold">

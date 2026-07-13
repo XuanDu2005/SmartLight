@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -9,18 +9,31 @@ import {
   Input,
   SmartImage,
   Spinner,
+  useToast,
 } from '@smartlight/ui';
 import { catalogApi } from '../lib/catalog-api';
+import { useAppDispatch } from '../store/hooks';
+import { addCartItem } from '../store/cart-slice';
 import { formatVND } from '../lib/format';
+import { ApiError } from '../lib/api-client';
 import type { ProductDetail, ProductVariantDto } from '../lib/api-types';
 
 export const ProductDetailPage = (): JSX.Element => {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const dispatch = useAppDispatch();
   const { slug = '' } = useParams<{ slug: string }>();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
+
+  useEffect(() => {
+    setHasToken(Boolean(localStorage.getItem('smartlight.access')));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -173,14 +186,63 @@ export const ProductDetailPage = (): JSX.Element => {
             <Button
               variant="primary"
               size="lg"
-              disabled={!activeVariant?.inStock}
-              onClick={() => {
-                window.alert('Add to cart chưa được wire tới cart API');
+              disabled={!activeVariant?.inStock || adding}
+              isLoading={adding}
+              onClick={async () => {
+                if (!activeVariant) return;
+                if (!hasToken) {
+                  toast.push('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng', 'info');
+                  navigate('/login');
+                  return;
+                }
+                setAdding(true);
+                try {
+                  await dispatch(
+                    addCartItem({ variantId: activeVariant.id, quantity }),
+                  ).unwrap();
+                  toast.push(
+                    quantity > 1
+                      ? `Đã thêm ${quantity} sản phẩm vào giỏ hàng`
+                      : 'Đã thêm vào giỏ hàng',
+                    'success',
+                  );
+                } catch (e) {
+                  const msg =
+                    e instanceof ApiError
+                      ? e.message
+                      : 'Không thể thêm vào giỏ hàng';
+                  toast.push(msg, 'error');
+                } finally {
+                  setAdding(false);
+                }
               }}
             >
               Thêm vào giỏ hàng
             </Button>
-            <Button variant="outline" size="lg">
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={!activeVariant?.inStock || adding}
+              isLoading={adding}
+              onClick={async () => {
+                if (!activeVariant) return;
+                if (!hasToken) {
+                  navigate('/login');
+                  return;
+                }
+                setAdding(true);
+                try {
+                  await dispatch(
+                    addCartItem({ variantId: activeVariant.id, quantity }),
+                  ).unwrap();
+                  navigate('/cart');
+                } catch {
+                  toast.push('Không thể mua ngay', 'error');
+                } finally {
+                  setAdding(false);
+                }
+              }}
+            >
               Mua ngay
             </Button>
           </div>

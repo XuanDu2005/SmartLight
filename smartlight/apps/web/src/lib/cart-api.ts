@@ -3,50 +3,60 @@
  */
 import { apiClient } from './api-client';
 
-export interface CartItemVariant {
-  id: string;
-  name: string;
-  sku: string;
-  imageUrl: string | null;
-  price: number;
-  currency: 'VND';
-}
-
-export interface CartItemProduct {
-  id: string;
-  name: string;
-  slug: string;
-}
-
 export interface CartItemDto {
   id: string;
+  cartId: string;
   productVariantId: string;
-  product: CartItemProduct;
-  variant: CartItemVariant;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  variantName: string;
+  sku: string;
+  imageUrl: string | null;
+  color: string | null;
+  size: string | null;
   quantity: number;
   unitPrice: number;
-  lineSubtotal: number;
-  currency: 'VND';
+  discountSnapshot: number;
+  subtotal: number;
+  inStock: boolean;
+  availableQuantity: number;
+  isSelected: boolean;
+  isProductActive: boolean;
+  isVariantActive: boolean;
+  maxQuantityPerOrder: number;
+  notes: string | null;
+  addedAt: string;
+  updatedAt: string;
 }
 
 export interface CartDto {
   id: string;
   userId: string | null;
   status: string;
-  currency: 'VND';
+  currency: string;
+  itemCount: number;
+  selectedItemCount: number;
   items: CartItemDto[];
+  couponCode: string | null;
   totals: {
     subtotal: number;
-    itemCount: number;
-    discountAmount: number;
+    discountTotal: number;
+    taxTotal: number;
+    shippingTotal: number;
+    estimatedShipping: number;
     grandTotal: number;
-    currency: 'VND';
+    selectedSubtotal: number;
+    currency: string;
   };
+  lastActivityAt: string;
+  expiresAt: string | null;
+  createdAt: string;
   updatedAt: string;
 }
 
 export interface AddCartItemInput {
-  productVariantId: string;
+  variantId: string;
   quantity: number;
 }
 
@@ -56,27 +66,27 @@ export interface UpdateCartItemInput {
 
 export const cartApi = {
   async getCart(): Promise<CartDto> {
-    const res = await apiClient.get<{ data: CartDto }>('/cart');
-    return res.data.data;
+    const res = await apiClient.get<CartDto>('/cart');
+    return res.data;
   },
 
   async addItem(input: AddCartItemInput): Promise<CartDto> {
-    const res = await apiClient.post<{ data: CartDto }>('/cart/items', input);
-    return res.data.data;
+    const res = await apiClient.post<CartDto>('/cart/items', input);
+    return res.data;
   },
 
   async updateItem(itemId: string, input: UpdateCartItemInput): Promise<CartDto> {
-    const res = await apiClient.patch<{ data: CartDto }>(`/cart/items/${itemId}`, input);
-    return res.data.data;
+    const res = await apiClient.patch<CartDto>(`/cart/items/${itemId}`, input);
+    return res.data;
   },
 
   async removeItem(itemId: string): Promise<CartDto> {
-    const res = await apiClient.delete<{ data: CartDto }>(`/cart/items/${itemId}`);
-    return res.data.data;
+    const res = await apiClient.delete<CartDto>(`/cart/items/${itemId}`);
+    return res.data;
   },
 
   async clear(): Promise<CartDto> {
-    const res = await apiClient.post<{ data: CartDto }>('/cart/clear');
-    return res.data.data;
+    const res = await apiClient.post<CartDto>('/cart/clear');
+    return res.data;
   },
 };

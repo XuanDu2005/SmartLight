@@ -27,8 +27,11 @@ export const fetchCart = createAsyncThunk('cart/fetch', async () => cartApi.getC
 
 export const addCartItem = createAsyncThunk(
   'cart/addItem',
-  async (input: { productVariantId: string; quantity: number }) => {
-    return cartApi.addItem(input);
+  async (input: { variantId: string; quantity: number }, { dispatch }) => {
+    // The POST /cart/items response omits `items` (server-side bug),
+    // so we ignore it and refetch the canonical cart from GET /cart.
+    await cartApi.addItem(input);
+    return dispatch(fetchCart()).unwrap();
   },
 );
 
@@ -75,14 +78,14 @@ const cartSlice = createSlice({
         state.error = action.error.message ?? 'Lỗi tải giỏ hàng';
       })
       .addCase(addCartItem.pending, (state, action) => {
-        state.pendingVariants.push(action.meta.arg.productVariantId);
+        state.pendingVariants.push(action.meta.arg.variantId);
         state.error = null;
       })
       .addCase(addCartItem.fulfilled, (state, action) => {
         state.cart = action.payload;
         state.status = 'ready';
         state.pendingVariants = state.pendingVariants.filter(
-          (v) => v !== action.meta.arg.productVariantId,
+          (v) => v !== action.meta.arg.variantId,
         );
       })
       .addCase(addCartItem.rejected, (state, action) => {

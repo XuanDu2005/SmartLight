@@ -26,7 +26,7 @@ export const RootLayout = (): JSX.Element => {
   const dispatch = useAppDispatch();
   const { theme } = useAppSelector((s) => s.ui);
   const { cart } = useAppSelector((s) => s.cart);
-  const itemCount = cart?.totals.itemCount ?? 0;
+  const itemCount = cart?.itemCount ?? 0;
 
   // Apply dark mode class to root.
   useEffect(() => {

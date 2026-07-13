@@ -311,10 +311,10 @@ export const CheckoutPage = (): JSX.Element => {
                   className="flex items-center justify-between gap-2"
                 >
                   <span className="line-clamp-2 text-neutral-700">
-                    {item.product.name} × {item.quantity}
+                    {item.productName} × {item.quantity}
                   </span>
                   <span className="text-neutral-900">
-                    {formatVND(item.lineSubtotal)}
+                    {formatVND(item.subtotal)}
                   </span>
                 </li>
               ))}
