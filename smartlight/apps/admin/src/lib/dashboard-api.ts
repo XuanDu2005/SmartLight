@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { apiClient, readList } from './api-client';
 import type { DashboardSummary, DashboardTimePoint, TopCategory, TopProduct } from './types';
 
 export interface AdminUserSummary {
@@ -67,21 +67,15 @@ export const dashboardApi = {
   buildAggregations: async (): Promise<DashboardOverview> => {
     const [ordersRes, productsRes] = await Promise.all([
       apiClient
-        .get<{ items: Array<Record<string, unknown>>; total: number }>(
-          '/admin/orders',
-          { params: { limit: 200 } },
-        )
+        .get('/admin/orders', { params: { limit: 100 } })
         .catch(() => ({ data: { items: [], total: 0 } })),
       apiClient
-        .get<{ items: Array<Record<string, unknown>>; total: number }>(
-          '/admin/catalog/products',
-          { params: { limit: 200 } },
-        )
+        .get('/admin/catalog/products', { params: { limit: 100 } })
         .catch(() => ({ data: { items: [], total: 0 } })),
     ]);
 
-    const orders = ordersRes.data.items;
-    const products = productsRes.data.items;
+    const orders = readList<Record<string, unknown>>(ordersRes.data).items;
+    const products = readList<Record<string, unknown>>(productsRes.data).items;
     // Backend does not yet expose /admin/users listing — we surface 0
     // customers and let operators add it once that endpoint ships.
     const customers: Array<Record<string, unknown>> = [];

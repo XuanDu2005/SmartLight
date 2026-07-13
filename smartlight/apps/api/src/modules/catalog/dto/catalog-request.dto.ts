@@ -212,7 +212,7 @@ export class ListBrandsQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   @Type(() => Number)
   limit?: number;
 
@@ -619,7 +619,7 @@ export class ListProductsQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   @Type(() => Number)
   limit?: number;
 

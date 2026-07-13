@@ -73,7 +73,7 @@ export const CategoriesPage = (): JSX.Element => {
     try {
       const [treeData, flatData] = await Promise.all([
         categoriesApi.tree(),
-        categoriesApi.listPublic({ limit: 200 }),
+        categoriesApi.listPublic({ limit: 100 }),
       ]);
       setTree(treeData);
       setFlat(flatData.items);

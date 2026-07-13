@@ -28,6 +28,8 @@ export const useAdminAuth = (): AdminAuthContextValue => {
   return ctx;
 };
 
+const SESSION_FLAG_KEY = 'smartlight.admin.hasSession';
+
 export const AdminAuthProvider = ({
   children,
 }: {
@@ -37,12 +39,25 @@ export const AdminAuthProvider = ({
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
+    // First-visit users have no session yet — skip refresh to keep
+    // the browser console free of expected 401s.
+    const hasSession =
+      typeof window !== 'undefined' &&
+      window.localStorage.getItem(SESSION_FLAG_KEY) === '1';
+    if (!hasSession) {
+      setUser(null);
+      setIsBootstrapping(false);
+      return;
+    }
     adminAuthApi
       .refresh()
       .then((res) => setUser(res.user))
       .catch((err) => {
         if (err instanceof ApiError && err.httpStatus === 401) {
           setUser(null);
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(SESSION_FLAG_KEY);
+          }
         }
       })
       .finally(() => setIsBootstrapping(false));
@@ -50,11 +65,17 @@ export const AdminAuthProvider = ({
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await adminAuthApi.login(email, password);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SESSION_FLAG_KEY, '1');
+    }
     setUser(res.user);
   }, []);
 
   const logout = useCallback(async () => {
     await adminAuthApi.logout();
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(SESSION_FLAG_KEY);
+    }
     setUser(null);
   }, []);
 
