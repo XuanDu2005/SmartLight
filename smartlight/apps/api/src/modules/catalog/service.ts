@@ -1596,6 +1596,12 @@ export class CatalogService {
         return [{ name: 'asc' }];
       case 'nameDesc':
         return [{ name: 'desc' }];
+      case 'bestSelling':
+      case 'topRated':
+        // Product model has no `soldCount` / `averageRating` columns yet,
+        // so fall back to recency until those aggregations are wired in.
+        return [{ createdAt: 'desc' }];
+      case 'newArrivals':
       case 'createdDesc':
       default:
         return [{ createdAt: 'desc' }];

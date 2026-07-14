@@ -51,15 +51,39 @@ export class ApiError extends Error {
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
+/**
+ * Refresh the access token via `/v1/auth/refresh`.
+ *
+ * The server rotates the refresh token in a Set-Cookie header AND returns a
+ * new access token in the JSON body (clients that don't use cookies can pass
+ * the refresh token in the request body instead). We persist the new access
+ * token via `setAccessToken` so the immediate retry of the original request
+ * uses the fresh credentials.
+ */
 const refresh = async (): Promise<boolean> => {
   if (!isRefreshing) {
     isRefreshing = true;
     refreshPromise = axios
-      .post(`${API_BASE_URL}${API_PREFIX}/auth/refresh`, null, {
+      .post<{
+        accessToken?: string;
+        refreshToken?: string;
+      }>(`${API_BASE_URL}${API_PREFIX}/auth/refresh`, null, {
         withCredentials: true,
       })
-      .then(() => true)
-      .catch(() => false)
+      .then((res) => {
+        const next = res.data?.accessToken;
+        if (next) {
+          setAccessToken(next);
+        }
+        return true;
+      })
+      .catch(() => {
+        // Refresh failed (refresh token also expired/revoked) — clear the
+        // stale access token so the *next* request doesn't keep retrying
+        // with dead credentials.
+        clearAccessToken();
+        return false;
+      })
       .finally(() => {
         isRefreshing = false;
         refreshPromise = null;

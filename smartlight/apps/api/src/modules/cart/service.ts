@@ -144,7 +144,7 @@ export class CartService {
       const subtotal = unitPrice.mul(targetQty);
       const imageUrl = await this.repo.getPrimaryImageForVariant(dto.variantId);
 
-      await this.repo.upsertCartItem(existing, {
+      await this.repo.upsertCartItem(tx, existing, {
         cartId,
         productVariantId: dto.variantId,
         quantity: targetQty,

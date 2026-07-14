@@ -155,27 +155,81 @@ export const ProductDetailPage = (): JSX.Element => {
             </div>
           )}
 
-          <FormField label="Số lượng" className="mt-2">
-            <div className="flex w-32 items-center gap-1">
+          <FormField
+            label="Số lượng"
+            className="mt-2"
+            hint={
+              activeVariant?.inStock
+                ? `Tối đa ${Math.min(activeVariant.stockCount, 999)} sản phẩm`
+                : undefined
+            }
+          >
+            <div className="flex w-44 items-stretch gap-2">
               <Button
-                size="sm"
+                size="md"
                 variant="outline"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                disabled={quantity <= 1}
+                aria-label="Giảm số lượng"
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
               >
                 −
               </Button>
               <Input
                 type="number"
+                inputSize="lg"
                 min={1}
                 value={quantity}
-                onChange={(e) =>
-                  setQuantity(Math.max(1, Number(e.currentTarget.value) || 1))
-                }
+                className="flex-1 min-w-[5rem] text-center text-lg font-semibold"
+                onChange={(e) => {
+                  const raw = Number(e.currentTarget.value);
+                  const cap =
+                    activeVariant?.inStock
+                      ? Math.min(activeVariant.stockCount, 999)
+                      : 1;
+                  if (!Number.isFinite(raw)) {
+                    // Empty / invalid: keep current quantity visible.
+                    // React will re-sync value={quantity} on next render.
+                    return;
+                  }
+                  const next = Math.max(1, Math.min(cap, Math.floor(raw)));
+                  setQuantity(next);
+                  // Force the DOM to reflect the clamped value if user typed beyond cap.
+                  if (String(next) !== e.currentTarget.value) {
+                    e.currentTarget.value = String(next);
+                  }
+                }}
+                onBlur={(e) => {
+                  // Final clamp on blur — guarantees a sane display value.
+                  const cap =
+                    activeVariant?.inStock
+                      ? Math.min(activeVariant.stockCount, 999)
+                      : 1;
+                  const raw = Number(e.currentTarget.value);
+                  const safe = Number.isFinite(raw) && raw >= 1
+                    ? Math.max(1, Math.min(cap, Math.floor(raw)))
+                    : Math.max(1, quantity);
+                  if (e.currentTarget.value !== String(safe)) {
+                    e.currentTarget.value = String(safe);
+                  }
+                  setQuantity(safe);
+                }}
               />
               <Button
-                size="sm"
+                size="md"
                 variant="outline"
-                onClick={() => setQuantity(quantity + 1)}
+                disabled={
+                  activeVariant?.inStock
+                    ? quantity >= Math.min(activeVariant.stockCount, 999)
+                    : true
+                }
+                aria-label="Tăng số lượng"
+                onClick={() => {
+                  const cap =
+                    activeVariant?.inStock
+                      ? Math.min(activeVariant.stockCount, 999)
+                      : 1;
+                  setQuantity((q) => Math.min(cap, q + 1));
+                }}
               >
                 +
               </Button>
@@ -207,10 +261,27 @@ export const ProductDetailPage = (): JSX.Element => {
                     'success',
                   );
                 } catch (e) {
-                  const msg =
-                    e instanceof ApiError
-                      ? e.message
-                      : 'Không thể thêm vào giỏ hàng';
+                  let msg = 'Không thể thêm vào giỏ hàng';
+                  if (e instanceof ApiError) {
+                    switch (e.code) {
+                      case 'CART_QUANTITY_EXCEEDS_STOCK':
+                        msg = `Số lượng vượt quá tồn kho (tối đa ${e.details && typeof e.details === 'object' && 'available' in e.details ? (e.details as { available?: number }).available : '?'})`;
+                        break;
+                      case 'CART_VARIANT_UNAVAILABLE':
+                        msg = 'Biến thể này hiện không khả dụng';
+                        break;
+                      case 'PRODUCT_INACTIVE':
+                      case 'VARIANT_INACTIVE':
+                        msg = 'Sản phẩm tạm ngừng bán';
+                        break;
+                      case 'AUTH_REQUIRED':
+                      case 'UNAUTHORIZED':
+                        msg = 'Vui lòng đăng nhập lại';
+                        break;
+                      default:
+                        msg = e.message;
+                    }
+                  }
                   toast.push(msg, 'error');
                 } finally {
                   setAdding(false);

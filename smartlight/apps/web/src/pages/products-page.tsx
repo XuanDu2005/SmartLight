@@ -33,7 +33,9 @@ export const ProductsPage = (): JSX.Element => {
 
   const q = params.get('q') ?? '';
   const categorySlug = params.get('categorySlug') ?? '';
-  const sort = params.get('sort') ?? 'createdDesc';
+  // Map user-friendly aliases to the backend's strict @IsIn list.
+  const rawSort = params.get('sort') ?? 'createdDesc';
+  const sort = rawSort === 'newArrivals' ? 'createdDesc' : rawSort;
   const page = Number(params.get('page') ?? 1);
   const limit = 12;
 

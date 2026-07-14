@@ -110,17 +110,55 @@ export const CartPage = (): JSX.Element => {
                     {formatVND(item.unitPrice)}
                   </div>
                 </div>
-                <FormField label="SL" htmlFor={`qty-${item.id}`}>
+                <FormField
+                  label="SL"
+                  htmlFor={`qty-${item.id}`}
+                  hint={`Còn ${item.availableQuantity}`}
+                >
                   <Input
                     id={`qty-${item.id}`}
                     type="number"
+                    inputSize="lg"
                     min={1}
                     value={item.quantity}
+                    className="w-28 text-center text-lg font-semibold"
                     onChange={(e) => {
-                      const next = Math.max(1, Number(e.currentTarget.value) || 1);
-                      void dispatch(updateCartItem({ itemId: item.id, quantity: next }));
+                      const raw = Number(e.currentTarget.value);
+                      const cap = Math.max(
+                        1,
+                        Math.min(item.availableQuantity, item.maxQuantityPerOrder),
+                      );
+                      if (!Number.isFinite(raw)) {
+                        // Empty / invalid: keep server value visible.
+                        return;
+                      }
+                      const next = Math.max(1, Math.min(cap, Math.floor(raw)));
+                      if (next !== item.quantity) {
+                        void dispatch(updateCartItem({ itemId: item.id, quantity: next }));
+                      }
+                      // Force the DOM to reflect clamp (e.g. when typing 99 with cap=10).
+                      if (String(next) !== e.currentTarget.value) {
+                        e.currentTarget.value = String(next);
+                      }
                     }}
-                    className="w-20"
+                    onBlur={(e) => {
+                      // On blur, if the user typed something out-of-range,
+                      // re-sync the DOM to the last server-confirmed quantity.
+                      const raw = Number(e.currentTarget.value);
+                      const cap = Math.max(
+                        1,
+                        Math.min(item.availableQuantity, item.maxQuantityPerOrder),
+                      );
+                      const safe = Number.isFinite(raw) && raw >= 1
+                        ? Math.max(1, Math.min(cap, Math.floor(raw)))
+                        : item.quantity;
+                      if (String(safe) !== e.currentTarget.value) {
+                        e.currentTarget.value = String(safe);
+                      }
+                      if (safe !== item.quantity) {
+                        void dispatch(updateCartItem({ itemId: item.id, quantity: safe }));
+                      }
+                    }}
                   />
                 </FormField>
                 <div className="w-28 text-right text-sm font-semibold text-neutral-900">

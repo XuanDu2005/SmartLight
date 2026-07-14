@@ -168,11 +168,12 @@ export class CartRepository {
   /* ============================================================== */
 
   async upsertCartItem(
+    tx: Prisma.TransactionClient,
     existing: CartItem | null,
     input: CartItemUpsertInput,
   ): Promise<CartItem> {
     if (existing) {
-      return this.prisma.cartItem.update({
+      return tx.cartItem.update({
         where: { id: existing.id },
         data: {
           quantity: input.quantity,
@@ -185,7 +186,42 @@ export class CartRepository {
         },
       });
     }
-    return this.prisma.cartItem.create({
+    // The schema has `@@unique([cartId, productVariantId])` which applies to
+    // ALL rows including soft-deleted ones. To honor the business rule of
+    // "one active line per (cart, variant)" without an expensive partial-index
+    // migration, we revive the most-recent tombstoned row if present instead
+    // of failing the create.
+    const tombstone = await tx.cartItem.findFirst({
+      where: {
+        cartId: input.cartId,
+        productVariantId: input.productVariantId,
+        deletedAt: { not: null },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (tombstone) {
+      return tx.cartItem.update({
+        where: { id: tombstone.id },
+        data: {
+          quantity: input.quantity,
+          unitPrice: input.unitPrice as any,
+          discountSnapshot: (input.discountSnapshot ?? 0) as any,
+          subtotal: input.subtotal as any,
+          productNameSnapshot: input.productNameSnapshot,
+          variantNameSnapshot: input.variantNameSnapshot,
+          skuSnapshot: input.skuSnapshot,
+          productSlug: input.productSlug,
+          productImageUrl: input.productImageUrl,
+          color: input.color ?? null,
+          size: input.size ?? null,
+          isSelected: input.isSelected,
+          availableStockAtAdd: input.availableStockAtAdd ?? null,
+          notes: input.notes ?? null,
+          deletedAt: null,
+        },
+      });
+    }
+    return tx.cartItem.create({
       data: {
         cartId: input.cartId,
         productVariantId: input.productVariantId,

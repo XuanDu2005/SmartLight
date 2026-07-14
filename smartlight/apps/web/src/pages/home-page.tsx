@@ -77,7 +77,7 @@ export const HomePage = (): JSX.Element => {
                 Khám phá sản phẩm
               </Button>
             </Link>
-            <Link to="/products?sort=newArrivals">
+            <Link to="/products?sort=createdDesc">
               <Button variant="outline" size="lg">
                 Sản phẩm mới
               </Button>

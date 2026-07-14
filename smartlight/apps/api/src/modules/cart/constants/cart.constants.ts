@@ -7,8 +7,10 @@
 export const CART_LIMITS = {
   /** Maximum distinct SKUs in a single cart. */
   MAX_ITEMS_PER_CART: 100,
-  /** Hard ceiling on per-line quantity. */
-  MAX_QUANTITY_PER_ITEM: 99,
+  /** Hard ceiling on per-line quantity. Generous so e-commerce users
+   *  buying in bulk (B2B, gifts, projects) don't hit an artificial wall.
+   *  Real stock is enforced by `inventory.available`. */
+  MAX_QUANTITY_PER_ITEM: 999,
   /** Lowest possible per-line quantity. */
   MIN_QUANTITY_PER_ITEM: 1,
   /**

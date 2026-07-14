@@ -607,7 +607,7 @@ export class ListProductsQueryDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['priceAsc', 'priceDesc', 'nameAsc', 'nameDesc', 'createdDesc', 'bestSelling', 'topRated'])
+  @IsIn(['priceAsc', 'priceDesc', 'nameAsc', 'nameDesc', 'createdDesc', 'newArrivals', 'bestSelling', 'topRated'])
   sort?: string;
 
   @IsOptional()
