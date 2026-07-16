@@ -31,7 +31,7 @@ const brandSchema = z.object({
   slug: z.string().optional(),
   description: z.string().optional(),
   logoUrl: z.string().url().optional().or(z.literal('')),
-  status: z.enum(['ACTIVE', 'INACTIVE']),
+  isActive: z.boolean(),
 });
 type BrandFormValues = z.infer<typeof brandSchema>;
 
@@ -182,8 +182,8 @@ export const BrandsPage = (): JSX.Element => {
                 </DataTableCell>
                 <DataTableCell>
                   <StatusPill
-                    status={b.status}
-                    variant={b.status === 'ACTIVE' ? 'success' : 'neutral'}
+                    status={b.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    variant={b.isActive ? 'success' : 'neutral'}
                   />
                 </DataTableCell>
                 <DataTableCell className="text-right">
@@ -266,7 +266,7 @@ const BrandDrawer = ({ state, onClose, onSaved }: BrandDrawerProps): JSX.Element
       slug: '',
       description: '',
       logoUrl: '',
-      status: 'ACTIVE',
+      isActive: true,
     },
   });
   const [saving, setSaving] = useState(false);
@@ -279,7 +279,7 @@ const BrandDrawer = ({ state, onClose, onSaved }: BrandDrawerProps): JSX.Element
         slug: state.brand.slug,
         description: state.brand.description ?? '',
         logoUrl: state.brand.logoUrl ?? '',
-        status: state.brand.status,
+        isActive: state.brand.isActive ?? true,
       });
     } else {
       form.reset({
@@ -287,7 +287,7 @@ const BrandDrawer = ({ state, onClose, onSaved }: BrandDrawerProps): JSX.Element
         slug: '',
         description: '',
         logoUrl: '',
-        status: 'ACTIVE',
+        isActive: true,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -302,8 +302,7 @@ const BrandDrawer = ({ state, onClose, onSaved }: BrandDrawerProps): JSX.Element
         name: values.name,
         slug: values.slug || undefined,
         description: values.description || undefined,
-        logoUrl: values.logoUrl || undefined,
-        status: values.status,
+        isActive: values.isActive,
       };
       if (state.mode === 'create') {
         await brandsApi.create(base as CreateBrandDto);
@@ -354,9 +353,9 @@ const BrandDrawer = ({ state, onClose, onSaved }: BrandDrawerProps): JSX.Element
           <Textarea {...form.register('description')} rows={3} />
         </FormField>
         <FormField label="Trạng thái">
-          <Select {...form.register('status')}>
-            <option value="ACTIVE">Đang hoạt động</option>
-            <option value="INACTIVE">Ngừng</option>
+          <Select {...form.register('isActive', { setValueAs: (v) => v === 'true' || v === true })}>
+            <option value="true">Đang hoạt động</option>
+            <option value="false">Ngừng</option>
           </Select>
         </FormField>
       </form>

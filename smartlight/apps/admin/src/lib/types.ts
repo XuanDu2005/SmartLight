@@ -218,11 +218,12 @@ export interface Category {
   slug: string;
   description?: string | null;
   parentId?: string | null;
-  position: number;
-  status: 'ACTIVE' | 'INACTIVE';
+  displayOrder: number;
+  isActive: boolean;
   imageUrl?: string | null;
+  isFeatured?: boolean;
   metaTitle?: string | null;
-  metaDescription?: string | null;
+  metaDesc?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -232,16 +233,22 @@ export interface CategoryTreeNode extends Category {
   productCount?: number;
 }
 
+/**
+ * Payload sent to the server. The actual API DTO uses `displayOrder`
+ * + `isActive` (not `position` + `status`) and `metaDesc` (not
+ * `metaDescription`). The page form layer mirrors the legacy names for
+ * readability and translates before submit.
+ */
 export interface CreateCategoryDto {
   name: string;
   slug?: string;
   description?: string;
   parentId?: string;
-  position?: number;
-  status?: 'ACTIVE' | 'INACTIVE';
+  displayOrder?: number;
+  isActive?: boolean;
   imageUrl?: string;
   metaTitle?: string;
-  metaDescription?: string;
+  metaDesc?: string;
 }
 
 export interface UpdateCategoryDto {
@@ -249,11 +256,11 @@ export interface UpdateCategoryDto {
   slug?: string;
   description?: string;
   parentId?: string;
-  position?: number;
-  status?: 'ACTIVE' | 'INACTIVE';
+  displayOrder?: number;
+  isActive?: boolean;
   imageUrl?: string;
   metaTitle?: string;
-  metaDescription?: string;
+  metaDesc?: string;
 }
 
 // ===========================================================================
@@ -265,8 +272,11 @@ export interface Brand {
   name: string;
   slug: string;
   description?: string | null;
+  logo?: { url: string; altText: string | null } | null;
   logoUrl?: string | null;
-  status: 'ACTIVE' | 'INACTIVE';
+  isActive: boolean;
+  isFeatured?: boolean;
+  productCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -275,16 +285,18 @@ export interface CreateBrandDto {
   name: string;
   slug?: string;
   description?: string;
-  logoUrl?: string;
-  status?: 'ACTIVE' | 'INACTIVE';
+  logoMediaId?: string;
+  isActive?: boolean;
+  isFeatured?: boolean;
 }
 
 export interface UpdateBrandDto {
   name?: string;
   slug?: string;
   description?: string;
-  logoUrl?: string;
-  status?: 'ACTIVE' | 'INACTIVE';
+  logoMediaId?: string;
+  isActive?: boolean;
+  isFeatured?: boolean;
 }
 
 // ===========================================================================

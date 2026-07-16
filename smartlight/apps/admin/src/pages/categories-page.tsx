@@ -26,6 +26,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { categoriesApi } from '../lib/categories-api';
+import { ApiError } from '../lib/api-client';
 import type {
   Category,
   CategoryTreeNode,
@@ -39,7 +40,7 @@ const categorySchema = z.object({
   description: z.string().optional(),
   parentId: z.string().optional(),
   position: z.coerce.number().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']),
+  isActive: z.boolean(),
   imageUrl: z.string().url().optional().or(z.literal('')),
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
@@ -202,11 +203,11 @@ export const CategoriesPage = (): JSX.Element => {
                     <DataTableCell>
                       <code className="text-xs">{c.slug}</code>
                     </DataTableCell>
-                    <DataTableCell>{c.position}</DataTableCell>
+                    <DataTableCell>{c.displayOrder}</DataTableCell>
                     <DataTableCell>
                       <StatusPill
-                        status={c.status}
-                        variant={c.status === 'ACTIVE' ? 'success' : 'neutral'}
+                        status={c.isActive ? 'ACTIVE' : 'INACTIVE'}
+                        variant={c.isActive ? 'success' : 'neutral'}
                       />
                     </DataTableCell>
                     <DataTableCell className="text-right">
@@ -320,7 +321,7 @@ const CategoryDrawer = ({
       description: '',
       parentId: '',
       position: 0,
-      status: 'ACTIVE',
+      isActive: true,
       imageUrl: '',
       metaTitle: '',
       metaDescription: '',
@@ -338,11 +339,11 @@ const CategoryDrawer = ({
         slug: c.slug,
         description: c.description ?? '',
         parentId: c.parentId ?? '',
-        position: c.position,
-        status: c.status,
+        position: c.displayOrder ?? 0,
+        isActive: c.isActive ?? true,
         imageUrl: c.imageUrl ?? '',
         metaTitle: c.metaTitle ?? '',
-        metaDescription: c.metaDescription ?? '',
+        metaDescription: c.metaDesc ?? '',
       });
     } else {
       form.reset({
@@ -351,7 +352,7 @@ const CategoryDrawer = ({
         description: '',
         parentId: '',
         position: 0,
-        status: 'ACTIVE',
+        isActive: true,
         imageUrl: '',
         metaTitle: '',
         metaDescription: '',
@@ -365,31 +366,50 @@ const CategoryDrawer = ({
   const onSubmit = form.handleSubmit(async (values) => {
     setSaving(true);
     try {
-      const base = {
+      // Translate form values (UX-friendly names) into the API DTO
+      // (`displayOrder`, `isActive`, `metaDesc`). Sending the wrong
+      // shape makes the server return 400 "property <name> should not exist".
+      const payload = {
         name: values.name,
         slug: values.slug || undefined,
         description: values.description || undefined,
         parentId: values.parentId || undefined,
-        position: values.position,
-        status: values.status,
+        displayOrder: values.position ?? 0,
+        isActive: values.isActive,
         imageUrl: values.imageUrl || undefined,
         metaTitle: values.metaTitle || undefined,
-        metaDescription: values.metaDescription || undefined,
+        metaDesc: values.metaDescription || undefined,
       };
       if (state.mode === 'create') {
-        await categoriesApi.create(base as CreateCategoryDto);
+        await categoriesApi.create(payload as CreateCategoryDto);
         push({ variant: 'success', title: 'Đã tạo danh mục' });
       } else if (state.category) {
-        await categoriesApi.update(state.category.id, base as UpdateCategoryDto);
+        await categoriesApi.update(state.category.id, payload as UpdateCategoryDto);
         push({ variant: 'success', title: 'Đã cập nhật danh mục' });
       }
       await onSaved();
     } catch (e) {
-      push({
-        variant: 'error',
-        title: 'Lỗi',
-        description: e instanceof Error ? e.message : 'Không thể lưu',
-      });
+      // Surface server-side validation details (e.g. "property X should
+      // not exist", "slug already exists") instead of a generic "Lỗi"
+      // toast. The envelope's `fieldErrors` array carries the granular
+      // reasons so the admin knows what to fix.
+      let title = 'Lỗi';
+      let description = 'Không thể lưu';
+      if (e instanceof ApiError) {
+        description = e.message;
+        const fieldErrors = (e as ApiError & { fieldErrors?: Array<{ message: string }> }).fieldErrors;
+        if (fieldErrors && fieldErrors.length > 0) {
+          description = fieldErrors.map((f) => f.message).join(' • ');
+        }
+        if (e.httpStatus === 400) {
+          title = 'Dữ liệu chưa hợp lệ';
+        } else if (e.httpStatus === 409) {
+          title = 'Xung đột dữ liệu';
+        }
+      } else if (e instanceof Error) {
+        description = e.message;
+      }
+      push({ variant: 'error', title, description });
     } finally {
       setSaving(false);
     }
@@ -440,9 +460,9 @@ const CategoryDrawer = ({
           </FormField>
         </div>
         <FormField label="Trạng thái">
-          <Select {...form.register('status')}>
-            <option value="ACTIVE">Đang hoạt động</option>
-            <option value="INACTIVE">Ngừng</option>
+          <Select {...form.register('isActive', { setValueAs: (v) => v === 'true' || v === true })}>
+            <option value="true">Đang hoạt động</option>
+            <option value="false">Ngừng</option>
           </Select>
         </FormField>
         <FormField label="Ảnh đại diện (URL)">

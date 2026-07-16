@@ -14,6 +14,7 @@ import {
 } from '@smartlight/ui';
 import { inventoryApi } from '../lib/inventory-api';
 import { productsApi } from '../lib/products-api';
+import { ApiError } from '../lib/api-client';
 import { formatVND } from '../lib/format';
 import type { InventoryStock, ProductDetail, ProductStatus, ProductVariant } from '../lib/types';
 
@@ -38,6 +39,7 @@ export const ProductDetailPage = (): JSX.Element => {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [stockByVariant, setStockByVariant] = useState<Record<string, InventoryStock | null>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState('overview');
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export const ProductDetailPage = (): JSX.Element => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const prod = await productsApi.getAdmin(params.id!);
         if (cancelled) return;
@@ -62,6 +65,23 @@ export const ProductDetailPage = (): JSX.Element => {
         if (!cancelled) {
           setStockByVariant(Object.fromEntries(stockEntries));
         }
+      } catch (e) {
+        if (cancelled) return;
+        // The admin console can devolve into "Uncaught (in promise)" if a
+        // rejection is thrown and nothing handles it. Catch + surface a
+        // friendly Vietnamese message instead.
+        if (e instanceof ApiError) {
+          setLoadError(
+            e.httpStatus === 404
+              ? 'Sản phẩm không tồn tại hoặc đã bị xoá.'
+              : e.message,
+          );
+        } else if (e instanceof Error) {
+          setLoadError(e.message);
+        } else {
+          setLoadError('Không thể tải sản phẩm');
+        }
+        setProduct(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -84,7 +104,10 @@ export const ProductDetailPage = (): JSX.Element => {
       <section className="container-page py-6">
         <EmptyState
           title="Không tìm thấy sản phẩm"
-          description="Sản phẩm đã bị xoá hoặc không tồn tại."
+          description={
+            loadError ??
+            'Sản phẩm đã bị xoá hoặc không tồn tại.'
+          }
           action={
             <Link to="/products">
               <Button>Quay lại danh sách</Button>

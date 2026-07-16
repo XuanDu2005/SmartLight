@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -18,11 +18,20 @@ import { formatVND } from '../lib/format';
 import { ApiError } from '../lib/api-client';
 import type { ProductDetail, ProductVariantDto } from '../lib/api-types';
 
+/**
+ * Returns true if the value looks like a Prisma CUID (starts with `c`,
+ * 25 chars). Used to disambiguate the `:slug` route param: storefront
+ * cards link to `/products/<slug>` (kebab-case), but admins and emails
+ * sometimes share `/products/<id>` links.
+ */
+const isCuid = (value: string): boolean => /^c[a-z0-9]{24}$/.test(value);
+
 export const ProductDetailPage = (): JSX.Element => {
   const navigate = useNavigate();
   const toast = useToast();
   const dispatch = useAppDispatch();
   const { slug = '' } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -36,18 +45,40 @@ export const ProductDetailPage = (): JSX.Element => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setErr(null);
-    catalogApi
-      .getProductBySlug(slug)
+
+    const fetcher = isCuid(slug)
+      ? catalogApi.getProductById(slug)
+      : catalogApi.getProductBySlug(slug);
+
+    fetcher
       .then((p) => {
+        if (cancelled) return;
         setProduct(p);
         const def = p.variants.find((v) => v.isDefault) ?? p.variants[0];
         setActiveVariantId(def?.id ?? null);
+
+        // If the URL was an ID, swap it for the canonical slug so the
+        // address bar is shareable and SEO-friendly. Preserve any query
+        // params (e.g. utm_source) the caller had attached.
+        if (isCuid(slug) && p.slug && p.slug !== slug) {
+          const qs = searchParams.toString();
+          navigate(`/products/${p.slug}${qs ? `?${qs}` : ''}`, { replace: true });
+        }
       })
-      .catch((e) => setErr(e instanceof Error ? e.message : 'Lỗi'))
-      .finally(() => setLoading(false));
-  }, [slug]);
+      .catch((e) => {
+        if (cancelled) return;
+        setErr(e instanceof Error ? e.message : 'Lỗi');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, navigate, searchParams]);
 
   if (loading) {
     return (
@@ -62,7 +93,7 @@ export const ProductDetailPage = (): JSX.Element => {
       <section className="container-page py-12">
         <EmptyState
           title="Không tìm thấy sản phẩm"
-          description={err ?? `Slug không tồn tại: ${slug}`}
+          description={err ?? `Sản phẩm không tồn tại (${slug})`}
           action={
             <Link to="/products">
               <Button variant="primary">Quay lại danh sách</Button>

@@ -414,6 +414,18 @@ export class CatalogController {
     return this.catalog.listProducts(query);
   }
 
+  @Get('admin/catalog/products/:id')
+  @Roles('admin', 'catalog_manager')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({ summary: 'Admin: get a single product by id (including drafts)' })
+  @ApiResponse({ status: 200, description: 'Product detail' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  async getProductAdmin(@Param('id') id: string, @Query('include') include?: string) {
+    const includes = include ? include.split(',').map((s) => s.trim()) : [];
+    const result = await this.catalog.getProductById(id, includes);
+    return { data: result };
+  }
+
   // =============================================================================
   //  ADMIN — Variants
   // =============================================================================
