@@ -367,13 +367,13 @@ const CategoryDrawer = ({
     setSaving(true);
     try {
       // Translate form values (UX-friendly names) into the API DTO
-      // (`displayOrder`, `isActive`, `metaDesc`). Sending the wrong
-      // shape makes the server return 400 "property <name> should not exist".
+      // (`displayOrder`, `isActive`, `metaDesc`). `parentId` is accepted
+      // in create but NOT in update — the backend UpdateCategoryDto has no
+      // such field, so omitting it here avoids 400 "property parentId should not exist".
       const payload = {
         name: values.name,
         slug: values.slug || undefined,
         description: values.description || undefined,
-        parentId: values.parentId || undefined,
         displayOrder: values.position ?? 0,
         isActive: values.isActive,
         imageUrl: values.imageUrl || undefined,
