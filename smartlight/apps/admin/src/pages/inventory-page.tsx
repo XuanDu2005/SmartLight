@@ -375,7 +375,7 @@ const InventoryActionDrawer = ({
       await inventoryApi.import({
         variantId: stock.variantId,
         quantity,
-        reason: reason || undefined,
+        note: reason || undefined,
       } as ImportStockDto);
       push({ variant: 'success', title: 'Đã nhập kho' });
       await onSaved();

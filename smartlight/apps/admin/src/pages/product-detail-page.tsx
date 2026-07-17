@@ -58,6 +58,10 @@ export const ProductDetailPage = (): JSX.Element => {
               const stock = await inventoryApi.get(v.id);
               return [v.id, stock] as const;
             } catch {
+              // Some legacy variants were created before the backend
+              // started auto-seeding an inventory row, so this 404s.
+              // The UI renders '—' for the missing stock and the admin
+              // can seed it from /inventory if they need a real number.
               return [v.id, null] as const;
             }
           }),

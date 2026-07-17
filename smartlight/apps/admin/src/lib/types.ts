@@ -349,8 +349,8 @@ export interface ListMovementsParams extends PaginationParams {
 export interface ImportStockDto {
   variantId: string;
   quantity: number;
-  warehouseId?: string;
-  reason?: string;
+  warehouseCode?: string;
+  note?: string;
 }
 
 export interface StockAdjustmentDto {

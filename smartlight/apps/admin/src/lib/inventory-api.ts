@@ -67,11 +67,22 @@ export const inventoryApi = {
   import: async (
     dto: ImportStockDto,
   ): Promise<{ variantId: string; onHand: number; available: number }> => {
+    // The server's `ImportStockDto.productVariantId` is `@IsUUID`+`@Min(1)`,
+    // but the admin client types carry `variantId` and `note`/`reason`
+    // differ. Translate before posting so we don't get a 500 with
+    // `findFirst({productVariantId: undefined})` matching an unrelated
+    // warehouse inventory row.
+    const serverPayload: Record<string, unknown> = {
+      productVariantId: dto.variantId,
+      quantity: dto.quantity,
+    };
+    if (dto.warehouseCode) serverPayload.warehouseCode = dto.warehouseCode;
+    if (dto.note) serverPayload.note = dto.note;
     const { data } = await apiClient.post<{
       variantId: string;
       onHand: number;
       available: number;
-    }>('/admin/inventory/import', dto);
+    }>('/admin/inventory/import', serverPayload);
     return data;
   },
 
