@@ -35,6 +35,28 @@ export interface PublicProductListResponse {
   limit: number;
 }
 
+// Helpers to defensively unwrap the server's `{ data, meta }` envelope.
+// The API standardises on a list endpoint that wraps items in
+// `{ data, meta }`. The earlier client code expected endpoints to return
+// the resource directly, which silently made `id` undefined for callers
+// that did `created.id` after `apiClient.post(...)`. These two helpers
+// hide the envelope from callers: pass `apiClient.post<T>()`'s response
+// and get the inner resource back.
+function unwrapResource<T>(response: unknown): T {
+  if (response && typeof response === 'object' && 'data' in (response as Record<string, unknown>)) {
+    return (response as { data: T }).data;
+  }
+  return response as T;
+}
+
+function unwrapList<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object' && Array.isArray((response as { data?: T[] }).data)) {
+    return ((response as { data: T[] }).data) as T[];
+  }
+  return [];
+}
+
 export const productsApi = {
   // =====================================================================
   //  Public storefront (used to fetch category/brand reference data)
@@ -53,14 +75,14 @@ export const productsApi = {
     const { data } = await apiClient.get<ProductDetail>(
       `/catalog/products/slug/${slug}`,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   getPublicById: async (id: string): Promise<ProductDetail> => {
     const { data } = await apiClient.get<ProductDetail>(
       `/catalog/products/${id}`,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   // =====================================================================
@@ -80,7 +102,7 @@ export const productsApi = {
     const { data } = await apiClient.get<ProductDetail>(
       `/admin/catalog/products/${id}`,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   create: async (dto: CreateProductDto): Promise<ProductDetail> => {
@@ -88,7 +110,7 @@ export const productsApi = {
       '/admin/catalog/products',
       dto,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   update: async (id: string, dto: UpdateProductDto): Promise<ProductDetail> => {
@@ -96,7 +118,7 @@ export const productsApi = {
       `/admin/catalog/products/${id}`,
       dto,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   remove: async (id: string): Promise<void> => {
@@ -107,21 +129,21 @@ export const productsApi = {
     const { data } = await apiClient.post<ProductDetail>(
       `/admin/catalog/products/${id}/publish`,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   unpublish: async (id: string): Promise<ProductDetail> => {
     const { data } = await apiClient.post<ProductDetail>(
       `/admin/catalog/products/${id}/unpublish`,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   restore: async (id: string): Promise<ProductDetail> => {
     const { data } = await apiClient.post<ProductDetail>(
       `/admin/catalog/products/${id}/restore`,
     );
-    return data;
+    return unwrapResource<ProductDetail>(data);
   },
 
   bulkPublish: async (ids: string[]): Promise<{ processed: number }> => {
@@ -129,7 +151,7 @@ export const productsApi = {
       '/admin/catalog/products/bulk-publish',
       { ids },
     );
-    return data;
+    return unwrapResource<{ processed: number }>(data);
   },
 
   bulkUnpublish: async (ids: string[]): Promise<{ processed: number }> => {
@@ -137,7 +159,7 @@ export const productsApi = {
       '/admin/catalog/products/bulk-unpublish',
       { ids },
     );
-    return data;
+    return unwrapResource<{ processed: number }>(data);
   },
 
   // =====================================================================
@@ -147,7 +169,7 @@ export const productsApi = {
     const { data } = await apiClient.get<ProductVariant[]>(
       `/catalog/products/${productId}/variants`,
     );
-    return data;
+    return unwrapList<ProductVariant>(data);
   },
 
   getVariant: async (
@@ -157,7 +179,7 @@ export const productsApi = {
     const { data } = await apiClient.get<ProductVariant>(
       `/catalog/products/${productId}/variants/${variantId}`,
     );
-    return data;
+    return unwrapResource<ProductVariant>(data);
   },
 
   createVariant: async (
@@ -168,7 +190,7 @@ export const productsApi = {
       `/admin/catalog/products/${productId}/variants`,
       dto,
     );
-    return data;
+    return unwrapResource<ProductVariant>(data);
   },
 
   updateVariant: async (
@@ -180,7 +202,7 @@ export const productsApi = {
       `/admin/catalog/products/${productId}/variants/${variantId}`,
       dto,
     );
-    return data;
+    return unwrapResource<ProductVariant>(data);
   },
 
   deleteVariant: async (productId: string, variantId: string): Promise<void> => {

@@ -154,6 +154,12 @@ export interface ProductFilterInput {
   featured?: boolean;
   newArrival?: boolean;
   status?: string;
+  /**
+   * When true the service returns products of any status (used by the
+   * admin listing endpoint). When false/undefined, only PUBLISHED
+   * products are visible by default (the storefront behaviour).
+   */
+  includeAllStatuses?: boolean;
   sort?: string;
   page?: number;
   limit?: number;

@@ -73,6 +73,7 @@ export interface ProductVariant {
   id: string;
   productId: string;
   sku: string;
+  name?: string | null;
   barcode?: string | null;
   price: MoneyAmount;
   compareAtPrice?: MoneyAmount | null;
@@ -124,6 +125,7 @@ export interface ProductDetail extends ProductSummary {
   metaTitle?: string | null;
   metaDescription?: string | null;
   metaKeywords?: string[] | null;
+  isNewArrival?: boolean;
   categoryId: string;
   brandId?: string | null;
   variants: ProductVariant[];

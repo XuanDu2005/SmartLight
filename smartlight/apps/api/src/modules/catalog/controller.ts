@@ -411,7 +411,26 @@ export class CatalogController {
   @ApiBearerAuth(SWAGGER_BEARER_AUTH)
   @ApiOperation({ summary: 'Admin: list all products (including drafts)' })
   async listProductsAdmin(@Query() query: AdminListProductsQueryDto) {
-    return this.catalog.listProducts(query);
+    return this.catalog.listProducts({
+      q: query.q,
+      categoryId: query.categoryId,
+      categorySlug: query.categorySlug,
+      brandId: query.brandId,
+      brandSlug: query.brandSlug,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
+      inStock: query.inStock,
+      featured: query.featured,
+      newArrival: query.newArrival,
+      status: query.status,
+      sort: query.sort,
+      page: query.page,
+      limit: query.limit,
+      // Admin views every status. Without this flag the service falls
+      // back to PUBLISHED-only and drafts become invisible right after
+      // creation — the bug that bit us earlier.
+      includeAllStatuses: true,
+    });
   }
 
   @Get('admin/catalog/products/:id')

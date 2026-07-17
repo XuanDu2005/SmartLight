@@ -6,18 +6,20 @@ import {
   MaxLength,
   MinLength,
   IsIn,
-  IsUUID,
+  IsArray,
+  ArrayMinSize,
   Min,
   Max,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Type } from 'class-transformer';
+import { IsId } from '../../../common/validators/is-id.validator';
 
 // ---- Category Request DTOs ----
 
 export class CreateCategoryDto {
   @IsOptional()
-  @IsUUID()
+  @IsId()
   parentId?: string;
 
   @IsString()
@@ -53,7 +55,7 @@ export class CreateCategoryDto {
   taxExempt?: boolean;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   imageMediaId?: string;
 
   @IsOptional()
@@ -103,7 +105,7 @@ export class UpdateCategoryDto {
   taxExempt?: boolean;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   imageMediaId?: string;
 
   @IsOptional()
@@ -119,7 +121,7 @@ export class UpdateCategoryDto {
 
 export class ListCategoriesQueryDto {
   @IsOptional()
-  @IsUUID()
+  @IsId()
   parentId?: string;
 
   @IsOptional()
@@ -160,7 +162,7 @@ export class CreateBrandDto {
   description?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   logoMediaId?: string;
 
   @IsOptional()
@@ -191,7 +193,7 @@ export class UpdateBrandDto {
   description?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   logoMediaId?: string;
 
   @IsOptional()
@@ -296,7 +298,7 @@ export class CreateVariantDto {
   attributesJson?: string;
 
   @IsOptional()
-  @IsUUID('4', { each: true })
+  @IsId({ each: true })
   imageMediaIds?: string[];
 
   @IsOptional()
@@ -368,7 +370,7 @@ export class UpdateVariantDto {
   displayOrder?: number;
 
   @IsOptional()
-  @IsUUID('4', { each: true })
+  @IsId({ each: true })
   imageMediaIds?: string[];
 }
 
@@ -428,11 +430,11 @@ export class CreateProductDto {
   @MaxLength(160)
   slug?: string;
 
-  @IsUUID()
+  @IsId()
   categoryId!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   brandId?: string;
 
   @IsOptional()
@@ -480,7 +482,7 @@ export class CreateProductDto {
   attributeValues?: ProductAttributeValueInputDto[];
 
   @IsOptional()
-  @IsUUID('4', { each: true })
+  @IsId({ each: true })
   imageMediaIds?: string[];
 
   @IsOptional()
@@ -508,11 +510,11 @@ export class UpdateProductDto {
   slug?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   categoryId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   brandId?: string;
 
   @IsOptional()
@@ -563,7 +565,7 @@ export class ListProductsQueryDto {
   q?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   categoryId?: string;
 
   @IsOptional()
@@ -571,7 +573,7 @@ export class ListProductsQueryDto {
   categorySlug?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsId()
   brandId?: string;
 
   @IsOptional()
@@ -663,12 +665,12 @@ export class BestSellersQueryDto {
 }
 
 export class BulkPublishDto {
-  @IsUUID('4', { each: true })
+  @IsId({ each: true })
   ids!: string[];
 }
 
 export class BulkUnpublishDto {
-  @IsUUID('4', { each: true })
+  @IsId({ each: true })
   ids!: string[];
 }
 

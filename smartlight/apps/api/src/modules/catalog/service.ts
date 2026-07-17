@@ -681,6 +681,8 @@ export class CatalogService {
       maxPrice,
       featured,
       newArrival,
+      status,
+      includeAllStatuses = false,
       sort = 'createdDesc',
       page = 1,
       limit = 20,
@@ -704,10 +706,24 @@ export class CatalogService {
       resolvedBrandId = brand?.id;
     }
 
+    // Status filter precedence:
+    //   1. caller passed an explicit `status` -> honour it (both admin
+    //      filters and the public storefront rely on this).
+    //   2. admin path (includeAllStatuses=true) -> don't filter status
+    //      at all, show every draft/archived/whatever the admin saved.
+    //   3. public path -> only PUBLISHED.
+    //
+    // Previously the service hardcoded PUBLISHED here which silently
+    // hid any draft from the admin list — admins thought their save
+    // had failed when it had actually succeeded.
     const where: Prisma.ProductWhereInput = {
       deletedAt: null,
-      status: ProductStatus.PUBLISHED as any,
     };
+    if (status) {
+      where.status = status as any;
+    } else if (!includeAllStatuses) {
+      where.status = ProductStatus.PUBLISHED as any;
+    }
     if (resolvedCategoryId) where.categoryId = resolvedCategoryId;
     if (resolvedBrandId) where.brandId = resolvedBrandId;
 
@@ -1079,20 +1095,31 @@ export class CatalogService {
         }
       }
 
-      if (!dto.imageMediaIds || dto.imageMediaIds.length === 0) {
+      // Image requirement is enforced only for products that are being
+      // published. Drafts and archived products are still useful without
+      // media (e.g. when the team hasn't shot them yet), so we let them
+      // be saved and warn upstream that they'll need images before
+      // hitting the storefront. This matches a typical CMS workflow
+      // where you can stage content first, polish later.
+      const resolvedStatus = (dto.status ?? 'DRAFT').toUpperCase();
+      const requiresImages =
+        resolvedStatus === 'PUBLISHED' || resolvedStatus === 'ACTIVE';
+      if (requiresImages && (!dto.imageMediaIds || dto.imageMediaIds.length === 0)) {
         throw new ProductMustHaveImageException();
       }
 
-      for (let i = 0; i < dto.imageMediaIds.length; i++) {
-        await tx.productImage.create({
-          data: {
-            productId: created.id,
-            mediaId: dto.imageMediaIds[i],
-            altText: null,
-            displayOrder: i,
-            isPrimary: i === 0,
-          },
-        });
+      if (dto.imageMediaIds && dto.imageMediaIds.length > 0) {
+        for (let i = 0; i < dto.imageMediaIds.length; i++) {
+          await tx.productImage.create({
+            data: {
+              productId: created.id,
+              mediaId: dto.imageMediaIds[i],
+              altText: null,
+              displayOrder: i,
+              isPrimary: i === 0,
+            },
+          });
+        }
       }
 
       return created;

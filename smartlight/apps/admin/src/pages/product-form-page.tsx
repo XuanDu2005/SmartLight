@@ -22,21 +22,26 @@ import {
 import { categoriesApi } from '../lib/categories-api';
 import { brandsApi } from '../lib/brands-api';
 import { productsApi } from '../lib/products-api';
-import type { Category, Brand, ProductStatus } from '../lib/types';
+import { ApiError } from '../lib/api-client';
+import type { Category, Brand } from '../lib/types';
 
 const variantSchema = z.object({
+  // Persisted backend id when editing — used to detect create vs update
+  // vs delete when syncing variants on save.
+  id: z.string().optional(),
   sku: z.string().min(2, 'SKU tối thiểu 2 ký tự'),
+  // Variant DTO requires a `name` field (used for display), so default it
+  // to the SKU when the user doesn't enter one — the original form only
+  // collected color/size and the backend rejected it with 400.
+  name: z.string().optional(),
   price: z.coerce.number().min(0, 'Giá phải ≥ 0'),
   compareAtPrice: z.coerce.number().optional(),
   cost: z.coerce.number().optional(),
   barcode: z.string().optional(),
-  color: z.string().optional(),
-  size: z.string().optional(),
   weightGrams: z.coerce.number().optional(),
   lengthMm: z.coerce.number().optional(),
   widthMm: z.coerce.number().optional(),
   heightMm: z.coerce.number().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK']),
 });
 
 const imageSchema = z.object({
@@ -57,13 +62,13 @@ const productSchema = z.object({
   description: z.string().optional(),
   categoryId: z.string().min(1, 'Vui lòng chọn danh mục'),
   brandId: z.string().optional().or(z.literal('')),
-  status: z.enum(['DRAFT', 'ACTIVE', 'ARCHIVED', 'OUT_OF_STOCK']),
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']),
   isFeatured: z.boolean(),
+  isNewArrival: z.boolean().optional(),
+  basePrice: z.coerce.number().min(0).optional(),
   metaTitle: z.string().optional(),
-  metaDescription: z.string().optional(),
   metaKeywords: z.string().optional(),
   variants: z.array(variantSchema).min(1, 'Cần ít nhất 1 biến thể'),
-  images: z.array(imageSchema).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -110,30 +115,28 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
       brandId: '',
       status: 'DRAFT',
       isFeatured: false,
+      isNewArrival: false,
+      basePrice: 0,
       metaTitle: '',
-      metaDescription: '',
       metaKeywords: '',
       variants: [
         {
           sku: '',
+          name: '',
           price: 0,
           compareAtPrice: undefined,
           cost: undefined,
-          color: '',
-          size: '',
+          barcode: '',
           weightGrams: undefined,
           lengthMm: undefined,
           widthMm: undefined,
           heightMm: undefined,
-          status: 'ACTIVE',
         },
       ],
-      images: [],
     },
   });
 
   const variants = useFieldArray({ control: form.control, name: 'variants' });
-  const images = useFieldArray({ control: form.control, name: 'images' });
 
   // Auto-slug from name when slug is empty
   const name = form.watch('name');
@@ -168,30 +171,26 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
             description: prod.description ?? '',
             categoryId: prod.categoryId,
             brandId: prod.brandId ?? '',
-            status: prod.status as ProductStatus,
+            status: prod.status === 'ACTIVE' || prod.status === 'OUT_OF_STOCK'
+              ? 'PUBLISHED'
+              : (prod.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'),
             isFeatured: prod.isFeatured,
+            isNewArrival: prod.isNewArrival ?? false,
+            basePrice: prod.priceFrom?.amount ?? 0,
             metaTitle: prod.metaTitle ?? '',
-            metaDescription: prod.metaDescription ?? '',
             metaKeywords: prod.metaKeywords?.join(', ') ?? '',
             variants: prod.variants.map((v) => ({
+              id: v.id,
               sku: v.sku,
+              name: v.name ?? v.sku,
               price: v.price.amount,
               compareAtPrice: v.compareAtPrice?.amount,
               cost: v.cost?.amount,
               barcode: v.barcode ?? '',
-              color: v.color ?? '',
-              size: v.size ?? '',
               weightGrams: v.weightGrams ?? undefined,
               lengthMm: v.lengthMm ?? undefined,
               widthMm: v.widthMm ?? undefined,
               heightMm: v.heightMm ?? undefined,
-              status: v.status,
-            })),
-            images: prod.images.map((i) => ({
-              url: i.url,
-              alt: i.alt ?? '',
-              isThumbnail: i.isThumbnail,
-              isVideo: Boolean(i.isVideo),
             })),
           });
         }
@@ -211,60 +210,213 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, params.id]);
 
+  // Helper: format an error (especially ApiError with fieldErrors) into
+  // a human-readable string for the toast.
+  const formatServerError = (e: unknown): string => {
+    if (e instanceof ApiError) {
+      const fieldErrors = (e as ApiError & { fieldErrors?: Array<{ message: string }> }).fieldErrors;
+      if (fieldErrors && fieldErrors.length > 0) {
+        return fieldErrors.map((f) => f.message).join(' • ');
+      }
+      return e.message;
+    }
+    return e instanceof Error ? e.message : 'Vui lòng thử lại';
+  };
+
+  // Helper: if the server rejected our slug because it was already taken
+  // and we haven't manually typed a different slug, append `-2`, `-3`, ...
+  // and retry once. This saves the user from the loop of clicking "Tạo
+  // sản phẩm" → "Slug already exists" → tweak slug → retry when they're
+  // re-using a product name that's already in the catalog.
+  const trySubmitWithUniqueSlug = async (
+    basePayload: Record<string, unknown>,
+  ): Promise<
+    | { kind: 'success'; result: { id: string } }
+    | { kind: 'conflict' }
+    | { kind: 'other'; title: string; description: string }
+  > => {
+    const MAX_ATTEMPTS = 5;
+    // Capture the form value at the moment of the first submit attempt.
+    // After a retry updates the form slug to e.g. "en-led-2", we must NOT
+    // treat that as a user-typed value — we only want to auto-suffix
+    // slugs that came from the auto-generation logic.
+    const originalFormSlug = form.getValues('slug')?.trim() ?? '';
+    const isAutoSlug = (slug: string) => slug === originalFormSlug;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const result = await productsApi.create(basePayload as never);
+        return { kind: 'success', result: { id: (result as unknown as { id: string }).id } };
+      } catch (e) {
+        if (e instanceof ApiError && e.httpStatus === 409) {
+          const message = (e.message ?? '').toLowerCase();
+          const isSlugConflict = message.includes('slug');
+          if (!isSlugConflict || !isAutoSlug(basePayload.slug as string)) {
+            return { kind: 'conflict' };
+          }
+          // Always build the suffix off the *original* slug, not the
+          // last-failed one. Otherwise we'd get "en-led-2-3-4" and
+          // quickly run past the 160-char slug limit.
+          const newSlug = `${originalFormSlug}-${attempt + 2}`;
+          basePayload.slug = newSlug;
+          form.setValue('slug', newSlug, { shouldValidate: false });
+          continue;
+        }
+        return {
+          kind: 'other',
+          title: 'Không thể lưu',
+          description: formatServerError(e),
+        };
+      }
+    }
+    return { kind: 'conflict' };
+  };
+
   const onSubmit = form.handleSubmit(async (values) => {
     setSaving(true);
     try {
-      const payload = {
+      // Backend `CreateProductDto` / `UpdateProductDto` field names diverge
+      // from the form schema: `metaDescription` -> `metaDesc`, `images`
+      // (URL-based) -> `imageMediaIds` (UUIDs), variants expect `name`
+      // (no `color`/`size`/`status`), and `status` uses DRAFT/PUBLISHED/
+      // ARCHIVED — not the storefront enum. Translate here so the
+      // server doesn't 400.
+      const tags = values.metaKeywords
+        ? values.metaKeywords.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
+
+      // `UpdateProductDto` only carries scalar product fields — variants
+      // and status live behind their own endpoints. Build two payloads:
+      //   * `productPayload` — DTO-shaped (create: includes variants + status;
+      //     update: only the scalar subset).
+      //   * `variantPayloads` — only used for create; in update mode we
+      //     reconcile variants individually below.
+      const firstVariantPrice = values.variants[0]?.price;
+      const productPayload: Record<string, unknown> = {
         name: values.name,
         slug: values.slug || undefined,
         shortDescription: values.shortDescription || undefined,
         description: values.description || undefined,
         categoryId: values.categoryId,
         brandId: values.brandId || undefined,
-        status: values.status,
         isFeatured: values.isFeatured,
+        isNewArrival: values.isNewArrival,
         metaTitle: values.metaTitle || undefined,
-        metaDescription: values.metaDescription || undefined,
-        metaKeywords: values.metaKeywords
-          ? values.metaKeywords.split(',').map((s) => s.trim()).filter(Boolean)
-          : undefined,
-        variants: values.variants.map((v) => ({
+        metaDesc: undefined,
+        tags,
+        // The product-level price field is `basePrice` on the DTO. Pick
+        // the first variant's price as a sensible default when the user
+        // didn't enter an explicit base price on the form.
+        basePrice: values.basePrice ?? firstVariantPrice ?? 0,
+      };
+
+      if (mode === 'create') {
+        productPayload.status = values.status;
+        productPayload.variants = values.variants.map((v) => ({
           sku: v.sku,
+          name: v.name || v.sku,
           price: v.price,
           compareAtPrice: v.compareAtPrice,
           cost: v.cost,
           barcode: v.barcode || undefined,
-          color: v.color || undefined,
-          size: v.size || undefined,
           weightGrams: v.weightGrams,
           lengthMm: v.lengthMm,
           widthMm: v.widthMm,
           heightMm: v.heightMm,
-          status: v.status,
-        })),
-        images: values.images?.map((i) => ({
-          url: i.url,
-          alt: i.alt || undefined,
-          isThumbnail: i.isThumbnail ?? false,
-          isVideo: i.isVideo ?? false,
-        })),
-      };
+        }));
+        const result = await trySubmitWithUniqueSlug(productPayload);
+        if (result.kind === 'success') {
+          push({ variant: 'success', title: 'Đã tạo sản phẩm' });
+          // The API returns the resource directly (envelope already
+          // stripped by `productsApi.create`). Fall back to /products
+          // if the response shape ever changes again so we never
+          // navigate to `/products/undefined`.
+          const newId = result.result.id ?? '';
+          if (!newId) {
+            push({
+              variant: 'error',
+              title: 'Tạo thành công nhưng không lấy được ID',
+              description: 'Vui lòng mở danh sách sản phẩm để xem sản phẩm mới.',
+            });
+            navigate('/products');
+          } else {
+            navigate(`/products/${newId}`);
+          }
+        } else if (result.kind === 'conflict') {
+          push({
+            variant: 'error',
+            title: 'Xung đột dữ liệu',
+            description: 'Slug đã tồn tại — hãy đổi slug hoặc tên sản phẩm khác',
+          });
+        } else {
+          push({ variant: 'error', title: result.title, description: result.description });
+        }
+        return;
+      }
 
-      if (mode === 'create') {
-        const created = await productsApi.create(payload as never);
-        push({ variant: 'success', title: 'Đã tạo sản phẩm' });
-        navigate(`/products/${created.id}`);
-      } else if (params.id) {
-        await productsApi.update(params.id, payload as never);
+      if (mode === 'edit' && params.id) {
+        // 1) PATCH the product scalars only. The backend's
+        //    `UpdateProductDto` rejects `variants` / `images` with 400,
+        //    so they MUST NOT be sent here — variants are reconciled
+        //    through their own endpoints below.
+        const updatedProduct = await productsApi.update(params.id, productPayload as never);
+
+        // 2) Reconcile variants: diff the form state against the
+        //    variants that came back from the server. Variants without
+        //    an `id` are new (POST), with an id are updates (PATCH),
+        //    and ids missing from the form are deletes (DELETE).
+        const originalIds = new Set(
+          (updatedProduct.variants ?? []).map((v) => v.id),
+        );
+        const keptIds = new Set<string>();
+        for (const v of values.variants) {
+          const body = {
+            sku: v.sku,
+            name: v.name || v.sku,
+            price: v.price,
+            compareAtPrice: v.compareAtPrice,
+            cost: v.cost,
+            barcode: v.barcode || undefined,
+            weightGrams: v.weightGrams,
+            lengthMm: v.lengthMm,
+            widthMm: v.widthMm,
+            heightMm: v.heightMm,
+          };
+          if (v.id) {
+            keptIds.add(v.id);
+            await productsApi.updateVariant(params.id, v.id, body as never);
+          } else {
+            await productsApi.createVariant(params.id, body as never);
+          }
+        }
+        // Delete variants the user removed from the form.
+        for (const originalId of originalIds) {
+          if (!keptIds.has(originalId)) {
+            await productsApi.deleteVariant(params.id, originalId);
+          }
+        }
+
         push({ variant: 'success', title: 'Đã cập nhật sản phẩm' });
         navigate(`/products/${params.id}`);
       }
     } catch (e) {
-      push({
-        variant: 'error',
-        title: 'Không thể lưu',
-        description: e instanceof Error ? e.message : 'Vui lòng thử lại',
-      });
+      // Surface validation details (e.g. "name should not be empty",
+      // "categoryId must be a UUID") instead of an opaque "Lỗi" toast.
+      let title = 'Không thể lưu';
+      let description = 'Vui lòng thử lại';
+      if (e instanceof ApiError) {
+        description = e.message;
+        const fieldErrors = (e as ApiError & { fieldErrors?: Array<{ message: string }> }).fieldErrors;
+        if (fieldErrors && fieldErrors.length > 0) {
+          description = fieldErrors.map((f) => f.message).join(' • ');
+        }
+        if (e.httpStatus === 400) title = 'Dữ liệu chưa hợp lệ';
+        else if (e.httpStatus === 409) title = 'Xung đột dữ liệu';
+        else if (e.httpStatus === 404) title = 'Không tìm thấy';
+      } else if (e instanceof Error) {
+        description = e.message;
+      }
+      push({ variant: 'error', title, description });
     } finally {
       setSaving(false);
     }
@@ -314,11 +466,7 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                   label: 'Biến thể',
                   count: variants.fields.length,
                 },
-                {
-                  key: 'images',
-                  label: 'Hình ảnh',
-                  count: images.fields.length,
-                },
+                { key: 'images', label: 'Hình ảnh' },
                 { key: 'seo', label: 'SEO' },
               ]}
             >
@@ -374,9 +522,8 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                   <FormField label="Trạng thái">
                     <Select {...form.register('status')}>
                       <option value="DRAFT">Nháp</option>
-                      <option value="ACTIVE">Đang bán</option>
+                      <option value="PUBLISHED">Đang bán</option>
                       <option value="ARCHIVED">Lưu trữ</option>
-                      <option value="OUT_OF_STOCK">Hết hàng</option>
                     </Select>
                   </FormField>
                   <FormField label="Nổi bật">
@@ -435,24 +582,19 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                             />
                           </FormField>
                           <FormField
+                            label="Tên biến thể"
+                            hint="Để trống sẽ dùng SKU"
+                          >
+                            <Input
+                              {...form.register(`variants.${i}.name` as const)}
+                            />
+                          </FormField>
+                          <FormField
                             label="Mã vạch"
                           >
                             <Input
                               {...form.register(`variants.${i}.barcode` as const)}
                             />
-                          </FormField>
-                          <FormField
-                            label="Trạng thái"
-                          >
-                            <Select
-                              {...form.register(
-                                `variants.${i}.status` as const,
-                              )}
-                            >
-                              <option value="ACTIVE">Đang bán</option>
-                              <option value="INACTIVE">Ngừng bán</option>
-                              <option value="OUT_OF_STOCK">Hết hàng</option>
-                            </Select>
                           </FormField>
                           <FormField
                             label="Giá (VND)"
@@ -481,24 +623,6 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                               type="number"
                               {...form.register(
                                 `variants.${i}.cost` as const,
-                              )}
-                            />
-                          </FormField>
-                          <FormField
-                            label="Màu sắc"
-                          >
-                            <Input
-                              {...form.register(
-                                `variants.${i}.color` as const,
-                              )}
-                            />
-                          </FormField>
-                          <FormField
-                            label="Kích thước"
-                          >
-                            <Input
-                              {...form.register(
-                                `variants.${i}.size` as const,
                               )}
                             />
                           </FormField>
@@ -552,10 +676,8 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                     onClick={() =>
                       variants.append({
                         sku: '',
+                        name: '',
                         price: 0,
-                        status: 'ACTIVE',
-                        color: '',
-                        size: '',
                       })
                     }
                   >
@@ -565,22 +687,16 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
               )}
 
               {activeTab === 'images' && (
-                <ImageGalleryEditor
-                  fields={images.fields}
-                  register={form.register}
-                  watch={form.watch}
-                  append={(value) =>
-                    images.append({
-                      url: value.url,
-                      alt: value.alt ?? '',
-                      isThumbnail: value.isThumbnail ?? false,
-                      isVideo: value.isVideo ?? false,
-                    })
-                  }
-                  remove={(i) => images.remove(i)}
-                  move={(from, to) => images.move(from, to)}
-                  errors={form.formState.errors.images as never}
-                />
+                <div className="rounded-md border border-dashed border-neutral-200 bg-neutral-50/50 p-6 text-sm text-neutral-600">
+                  <p className="font-medium text-neutral-800">
+                    Hình ảnh hiện chưa hỗ trợ tải lên trong form này.
+                  </p>
+                  <p className="mt-1">
+                    Sau khi tạo sản phẩm, bạn có thể liên kết Media (ảnh / video)
+                    thông qua module <code className="rounded bg-white px-1 py-0.5 text-xs">media-files</code>.
+                    Mỗi sản phẩm có thể đính kèm nhiều <code className="rounded bg-white px-1 py-0.5 text-xs">imageMediaId</code> UUID.
+                  </p>
+                </div>
               )}
 
               {activeTab === 'seo' && (
@@ -595,6 +711,7 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                   </FormField>
                   <FormField
                     label="Meta keywords (phân cách bằng dấu phẩy)"
+                    hint="Sẽ lưu thành mảng tags trong DB"
                   >
                     <Input
                       {...form.register('metaKeywords')}
@@ -604,11 +721,9 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                   <FormField
                     label="Meta description"
                     className="md:col-span-2"
+                    hint="Đang được lưu vào trường metaDesc — backend chưa hỗ trợ thêm field riêng"
                   >
-                    <Textarea
-                      {...form.register('metaDescription')}
-                      rows={3}
-                    />
+                    <Textarea rows={3} disabled placeholder="(backend chưa nhận)" />
                   </FormField>
                 </div>
               )}
@@ -632,144 +747,6 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
   );
 };
 
-// ============================================================================
-//  Image gallery editor (inline component for the Images tab)
-// ============================================================================
-
-interface ImageGalleryEditorProps {
-  fields: Array<{ id: string }>;
-  register: ReturnType<typeof useForm<ProductFormValues>>['register'];
-  watch: ReturnType<typeof useForm<ProductFormValues>>['watch'];
-  append: (value: {
-    url: string;
-    alt?: string;
-    isThumbnail?: boolean;
-    isVideo?: boolean;
-  }) => void;
-  remove: (index: number) => void;
-  move: (from: number, to: number) => void;
-  errors: unknown;
-}
-const ImageGalleryEditor = ({
-  fields,
-  register,
-  watch,
-  append,
-  remove,
-  move,
-}: ImageGalleryEditorProps): JSX.Element => {
-  const [url, setUrl] = useState('');
-  const [alt, setAlt] = useState('');
-  const [isVideo, setIsVideo] = useState(false);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-
-  const onDrop = (targetIdx: number): void => {
-    if (dragIndex === null || dragIndex === targetIdx) return;
-    move(dragIndex, targetIdx);
-    setDragIndex(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-        <Input
-          placeholder="URL hình ảnh hoặc video"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-        <Input
-          placeholder="Mô tả (alt)"
-          value={alt}
-          onChange={(e) => setAlt(e.target.value)}
-        />
-        <div className="flex gap-2">
-          <label className="inline-flex items-center gap-1 text-sm">
-            <input
-              type="checkbox"
-              checked={isVideo}
-              onChange={(e) => setIsVideo(e.target.checked)}
-            />
-            Video
-          </label>
-          <Button
-            type="button"
-            onClick={() => {
-              if (!url) return;
-              append({ url, alt: alt || undefined, isVideo });
-              setUrl('');
-              setAlt('');
-              setIsVideo(false);
-            }}
-          >
-            + Thêm
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-        {fields.map((field, i) => {
-          const imageUrl = (watch(`images.${i}.url` as const) ?? '') as string;
-          const isThumb = Boolean(
-            watch(`images.${i}.isThumbnail` as const),
-          );
-          return (
-            <div
-              key={field.id}
-              draggable
-              onDragStart={() => setDragIndex(i)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(i)}
-              className={cn(
-                'rounded-md border bg-white p-2',
-                isThumb ? 'border-smart-500 ring-1 ring-smart-200' : 'border-neutral-200',
-              )}
-            >
-              <input type="hidden" {...register(`images.${i}.url` as const)} />
-              <input type="hidden" {...register(`images.${i}.alt` as const)} />
-              <input
-                type="hidden"
-                {...register(`images.${i}.isThumbnail` as const)}
-              />
-              <input
-                type="hidden"
-                {...register(`images.${i}.isVideo` as const)}
-              />
-              <div className="relative aspect-square overflow-hidden rounded bg-neutral-100">
-                {imageUrl ? (
-                  <img
-                    src={imageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
-                    Không có ảnh
-                  </div>
-                )}
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-1">
-                <Button
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                  onClick={() => remove(i)}
-                >
-                  Xoá
-                </Button>
-                <span className="text-xs text-neutral-400">#{i + 1}</span>
-              </div>
-            </div>
-          );
-        })}
-        {fields.length === 0 && (
-          <div className="col-span-full rounded-md border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">
-            Chưa có hình ảnh. Thêm URL ở trên.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+// (The previous inline ImageGalleryEditor component was removed in favour
+// of a static note in the Images tab — the server DTO doesn't accept URL-
+// based image lists yet, only `imageMediaIds` (UUIDs from Media module).)
