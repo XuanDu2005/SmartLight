@@ -122,21 +122,56 @@ export const createApiClient = (): AxiosInstance => {
 export const apiClient = createApiClient();
 
 /**
- * Unwrap the server's `{ data, meta.pagination }` envelope into the legacy
+ * Unwrap the server's paginated envelope into the legacy
  * `Paginated<T>` view (`{ items, total, page, limit }`) so existing pages
  * can keep reading `result.items.length` / `result.total` without changes.
+ *
+ * Handles both response shapes the API has shipped over time:
+ * - `{ data: T[], meta: { pagination: { totalItems, page, limit } } }` — new
+ * - `{ items: T[], total, page, limit }` — legacy
+ * - bare `T[]` — last-resort fallback
  */
 export function unwrapPaginated<T>(
-  envelope: PaginatedEnvelope<T>,
+  envelope: unknown,
 ): Paginated<T> {
-  const data = Array.isArray(envelope?.data) ? envelope.data : [];
-  const meta = envelope?.meta?.pagination;
-  return {
-    items: data,
-    total: meta?.totalItems ?? data.length,
-    page: meta?.page ?? 1,
-    limit: meta?.limit ?? data.length,
+  if (Array.isArray(envelope)) {
+    return {
+      items: envelope as T[],
+      total: envelope.length,
+      page: 1,
+      limit: envelope.length,
+    };
+  }
+  if (!envelope || typeof envelope !== 'object') {
+    return { items: [], total: 0, page: 1, limit: 0 };
+  }
+  const env = envelope as {
+    items?: T[];
+    data?: T[];
+    total?: number;
+    page?: number;
+    limit?: number;
+    meta?: { pagination?: { totalItems?: number; page?: number; limit?: number } };
   };
+
+  const items: T[] = Array.isArray(env.items)
+    ? env.items
+    : Array.isArray(env.data)
+      ? env.data
+      : [];
+
+  const meta = env.meta?.pagination;
+  const total =
+    typeof env.total === 'number'
+      ? env.total
+      : typeof meta?.totalItems === 'number'
+        ? meta.totalItems
+        : items.length;
+
+  const page = env.page ?? meta?.page ?? 1;
+  const limit = env.limit ?? meta?.limit ?? items.length;
+
+  return { items, total, page, limit };
 }
 
 /**
