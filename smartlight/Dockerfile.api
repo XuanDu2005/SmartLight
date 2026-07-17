@@ -27,12 +27,16 @@ COPY apps/admin/package.json        ./apps/admin/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --filter @smartlight/api... --frozen-lockfile
 
-# Generate Prisma client (the linux-musl binary would be wrong for Debian;
-# Prisma re-detects platform per generator run, so we run it later in the
-# Debian runtime stage to produce the correct glibc engine binary.)
+# Generate Prisma client. The builder is on Alpine (musl + libssl 3)
+# which Prisma 5's generators can't use for the query-engine binary, so
+# we only produce the JS client artifacts here (no engine binary) by
+# skipping the engine download. The runtime stage regenerates the
+# client on Debian-slim (glibc + libssl 3) to get the correct engine.
 COPY apps/api/prisma ./apps/api/prisma
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm --filter @smartlight/api exec prisma generate
+    pnpm --filter @smartlight/api exec prisma generate \
+      --no-engine
 
 # Build shared/config first (their compiled JS is referenced by the API's
 # runtime require graph via tsconfig path mappings).

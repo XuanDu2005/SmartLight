@@ -81,3 +81,27 @@ export class AdminListPaymentsQueryDto extends ListPaymentsQueryDto {
   @MaxLength(20)
   provider?: string;
 }
+
+/**
+ * Admin-only: confirm an offline payment for an order that is still
+ * `PENDING_PAYMENT`. Used when money arrives outside the online
+ * gateway (bank transfer, COD, in-store POS).
+ */
+export class ConfirmOfflinePaymentDto {
+  /** Order reference (internal id). */
+  @IsString()
+  @MaxLength(64)
+  orderId!: string;
+
+  /** Bank transfer reference / Mã giao dịch ngân hàng. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  referenceCode?: string;
+
+  /** Free-form admin note (shown in order history). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}

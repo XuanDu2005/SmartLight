@@ -27,7 +27,9 @@ import type {
 const statusVariant = (s: PaymentStatus) => {
   switch (s) {
     case 'SUCCEEDED':
+    case 'SUCCESS':
       return 'success' as const;
+    case 'CREATED':
     case 'PROCESSING':
     case 'PENDING':
       return 'info' as const;

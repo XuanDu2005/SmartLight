@@ -16,7 +16,12 @@
  * Money math uses Prisma.Decimal \u2014 never raw number.
  */
 import { Injectable, Logger } from '@nestjs/common';
-import { OrderStatus, PaymentProvider, PaymentStatus } from '@prisma/client';
+import {
+  OrderPaymentStatus,
+  OrderStatus,
+  PaymentProvider,
+  PaymentStatus,
+} from '@prisma/client';
 
 import { PaymentsRepository } from './repositories/payments.repository';
 import { MomoGateway } from './gateways/momo.gateway';
@@ -52,6 +57,7 @@ import type {
   RetryPaymentDto,
   ListPaymentsQueryDto,
   AdminListPaymentsQueryDto,
+  ConfirmOfflinePaymentDto,
 } from './dto/create-payment.dto';
 import type {
   AdminPaymentListResponseDto,
@@ -338,6 +344,138 @@ export class PaymentsService {
     const payment = await this.repo.findById(paymentId);
     if (!payment) throw new PaymentNotFoundException(paymentId);
     return this.mapToDetailResponse(payment);
+  }
+
+  /**
+   * Admin-only: confirm an offline payment (bank transfer reconciled,
+   * COD collected, etc.) without going through a gateway webhook.
+   *
+   * Behaviour:
+   *   1. Load order, must be PENDING_PAYMENT
+   *   2. Reject if a SUCCESS payment already exists for this order
+   *   3. Create a `Payment` row with provider=MANUAL, status=SUCCESS
+   *   4. Move order to PAID + payment_status=PAID
+   *   5. Append OrderStatusHistory (admin actor)
+   *
+   * Returns the resulting Payment detail.
+   */
+  async confirmOfflinePayment(
+    orderId: string,
+    adminId: string,
+    adminName: string | null,
+    dto: ConfirmOfflinePaymentDto,
+  ): Promise<PaymentDetailDto> {
+    return this.repo.withTransaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+      });
+      if (!order) {
+        throw new OrderNotFoundForPaymentException(orderId);
+      }
+      if (order.status !== 'PENDING_PAYMENT') {
+        throw new OrderNotPayableException(orderId, order.status);
+      }
+
+      const existing = await tx.payment.findUnique({
+        where: { orderId },
+      });
+      if (existing && existing.status === 'SUCCESS') {
+        throw new PaymentAlreadyCompletedException(existing.id);
+      }
+
+      const amount = order.grandTotal;
+      const currency = order.currency ?? 'VND';
+      const now = new Date();
+
+      const payment = existing
+        ? await tx.payment.update({
+            where: { id: existing.id },
+            data: {
+              provider: PaymentProvider.MANUAL,
+              status: PaymentStatus.SUCCESS,
+              amount,
+              currency,
+              succeededAt: now,
+              failureReason: null,
+              failedAt: null,
+              cancelledAt: null,
+              metadataJson: {
+                ...((existing as any).metadataJson ?? {}),
+                confirmedBy: adminId,
+                confirmedAt: now.toISOString(),
+                note: dto.note ?? null,
+                referenceCode: dto.referenceCode ?? null,
+              },
+            },
+          })
+        : await tx.payment.create({
+            data: {
+              orderId,
+              userId: order.userId,
+              provider: PaymentProvider.MANUAL,
+              status: PaymentStatus.SUCCESS,
+              amount,
+              currency,
+              succeededAt: now,
+              metadataJson: {
+                confirmedBy: adminId,
+                confirmedAt: now.toISOString(),
+                note: dto.note ?? null,
+                referenceCode: dto.referenceCode ?? null,
+              },
+            },
+          });
+
+      await tx.paymentTransaction.create({
+        data: {
+          paymentId: payment.id,
+          type: 'CAPTURE',
+          status: 'SUCCESS',
+          amount,
+          providerCode: 'MANUAL_CONFIRM',
+          providerMessage: dto.note ?? 'Admin manual confirmation',
+          providerTxnId: dto.referenceCode ?? null,
+        },
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.PAID,
+          paymentStatus: OrderPaymentStatus.PAID,
+          paidAt: now,
+        },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          fromStatus: 'PENDING_PAYMENT',
+          toStatus: 'PAID',
+          changedByType: 'ADMIN_USER',
+          changedById: adminId,
+          changedByName: adminName ?? 'admin',
+          reason:
+            dto.note ||
+            `Admin confirmed offline payment${dto.referenceCode ? ` (ref ${dto.referenceCode})` : ''}`,
+        },
+      });
+
+      const reloaded = await tx.payment.findUnique({
+        where: { id: payment.id },
+        include: {
+          order: true,
+          transactions: { orderBy: { createdAt: 'desc' } },
+          webhookLogs: { orderBy: { createdAt: 'desc' } },
+        },
+      });
+
+      this.logger.log(
+        `Offline payment confirmed: order=${order.orderNumber} admin=${adminId} amount=${this.d2n(amount)}`,
+      );
+
+      return this.mapToDetailResponse(reloaded);
+    });
   }
 
   /* ============================================================== */

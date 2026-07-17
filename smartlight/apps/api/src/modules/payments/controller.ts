@@ -36,6 +36,7 @@ import { SWAGGER_BEARER_AUTH } from '../../config/swagger';
 
 import type {
   AdminListPaymentsQueryDto,
+  ConfirmOfflinePaymentDto,
   CreatePaymentDto,
   ListPaymentsQueryDto,
   RetryPaymentDto,
@@ -134,6 +135,31 @@ export class PaymentsController {
     @Param('id') paymentId: string,
   ): Promise<PaymentDetailDto> {
     return this.paymentsService.getPaymentForAdmin(paymentId);
+  }
+
+  /**
+   * Admin: confirm an offline payment for an order still in
+   * `PENDING_PAYMENT` (bank transfer, COD, in-store POS). The endpoint
+   * creates a `Payment` row with provider=`MANUAL`, marks it SUCCESS,
+   * and moves the order to `PAID` in a single transaction.
+   */
+  @Post('admin/payments/confirm')
+  @Roles('admin', 'finance_manager')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH)
+  @ApiOperation({
+    summary: 'Admin: confirm an offline payment for an order',
+  })
+  async confirmOffline(
+    @CurrentUser() admin: UserPrincipal,
+    @Body() dto: ConfirmOfflinePaymentDto,
+  ): Promise<PaymentDetailDto> {
+    return this.paymentsService.confirmOfflinePayment(
+      dto.orderId,
+      admin.id,
+      admin.email,
+      dto,
+    );
   }
 
   /* ============================================================== */

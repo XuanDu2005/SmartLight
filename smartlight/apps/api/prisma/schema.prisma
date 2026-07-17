@@ -1031,6 +1031,8 @@ enum PaymentProvider {
   MOMO
   VNPAY
   PAYPAL
+  // MANUAL: admin-confirmed offline payment (bank transfer, COD, etc.)
+  MANUAL
 }
 
 enum PaymentTransactionStatus {

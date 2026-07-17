@@ -17,6 +17,7 @@ import {
   useToast,
 } from '@smartlight/ui';
 import { ordersApi } from '../lib/orders-api';
+import { paymentsApi } from '../lib/payments-api';
 import { formatVND } from '../lib/format';
 import type { Order, OrderStatus, UpdateOrderStatusDto } from '../lib/types';
 
@@ -50,7 +51,10 @@ export const OrderDetailPage = (): JSX.Element => {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('items');
   const [transitionOpen, setTransitionOpen] = useState(false);
+  const [confirmPaymentOpen, setConfirmPaymentOpen] = useState(false);
   const [nextStatus, setNextStatus] = useState<OrderStatus | null>(null);
+  const [confirmNote, setConfirmNote] = useState('');
+  const [confirmRef, setConfirmRef] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -100,6 +104,31 @@ export const OrderDetailPage = (): JSX.Element => {
     }
   };
 
+  const handleConfirmPayment = async (): Promise<void> => {
+    if (!order) return;
+    setBusy(true);
+    try {
+      await paymentsApi.confirmOffline({
+        orderId: order.id,
+        referenceCode: confirmRef || undefined,
+        note: confirmNote || undefined,
+      });
+      push({ variant: 'success', title: 'Đã xác nhận thanh toán' });
+      setConfirmPaymentOpen(false);
+      setConfirmNote('');
+      setConfirmRef('');
+      await reload();
+    } catch (e) {
+      push({
+        variant: 'error',
+        title: 'Lỗi',
+        description: e instanceof Error ? e.message : '',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -116,6 +145,9 @@ export const OrderDetailPage = (): JSX.Element => {
   }
 
   const allowed = TRANSITIONS[order.status] ?? [];
+
+  const canConfirmPayment =
+    order.status === 'PENDING_PAYMENT' && order.paymentStatus === 'UNPAID';
 
   return (
     <section className="container-page py-6">
@@ -150,6 +182,14 @@ export const OrderDetailPage = (): JSX.Element => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canConfirmPayment && (
+            <Button
+              variant="primary"
+              onClick={() => setConfirmPaymentOpen(true)}
+            >
+              Xác nhận thanh toán
+            </Button>
+          )}
           {allowed.length > 0 && (
             <Button onClick={() => setTransitionOpen(true)}>
               Cập nhật trạng thái
@@ -373,6 +413,53 @@ export const OrderDetailPage = (): JSX.Element => {
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                rows={3}
+              />
+            </FormField>
+          </div>
+        </Drawer>
+      )}
+
+      {confirmPaymentOpen && (
+        <Drawer
+          open
+          onClose={() => setConfirmPaymentOpen(false)}
+          title="Xác nhận thanh toán"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setConfirmPaymentOpen(false)}>
+                Huỷ
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void handleConfirmPayment()}
+                isLoading={busy}
+              >
+                Xác nhận
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-neutral-600">
+              Xác nhận đã nhận được thanh toán cho đơn hàng{' '}
+              <strong>{order?.code}</strong>. Thao tác này sẽ tạo bản ghi
+              thanh toán và chuyển đơn hàng sang <strong>Đã thanh toán</strong>.
+            </p>
+            <FormField label="Mã giao dịch (tuỳ chọn)">
+              <input
+                type="text"
+                value={confirmRef}
+                onChange={(e) => setConfirmRef(e.target.value)}
+                placeholder="VD: VCB-123456, CK-20260717-001"
+                className="block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </FormField>
+            <FormField label="Ghi chú (tuỳ chọn)">
+              <Textarea
+                value={confirmNote}
+                onChange={(e) => setConfirmNote(e.target.value)}
+                placeholder="VD: Khách chuyển khoản đủ, đã đối soát sao kê"
                 rows={3}
               />
             </FormField>

@@ -462,11 +462,13 @@ export interface UpdateOrderStatusDto {
 //  Payments
 // ===========================================================================
 
-export type PaymentProvider = 'MOMO' | 'VNPAY' | 'PAYPAL';
+export type PaymentProvider = 'MOMO' | 'VNPAY' | 'PAYPAL' | 'MANUAL';
 export type PaymentStatus =
+  | 'CREATED'
   | 'PENDING'
   | 'PROCESSING'
   | 'SUCCEEDED'
+  | 'SUCCESS'
   | 'FAILED'
   | 'REFUNDED'
   | 'CANCELLED';

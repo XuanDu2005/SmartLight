@@ -88,11 +88,20 @@ export const dashboardApi = {
     );
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const sumTotal = (rows: Array<Record<string, unknown>>): number =>
-      rows.reduce(
-        (acc, r) => acc + Number((r.total as { amount?: number })?.amount ?? 0),
-        0,
-      );
+    // The wire DTO /admin/orders returns `grandTotal: number` flat on every
+    // list item (AdminOrderListItemDto). For the detail endpoint, totals are
+    // nested under `totals.grandTotal`. Either is fine here since we only
+    // read `grandTotal` for revenue maths.
+    const revenueOf = (r: Record<string, unknown>): number => {
+      const fromList = Number(r.grandTotal ?? 0);
+      if (fromList) return fromList;
+      const nested = (r.totals as { grandTotal?: number } | undefined)
+        ?.grandTotal;
+      return Number(nested ?? 0);
+    };
+    const sumRevenue = (
+      rows: Array<Record<string, unknown>>,
+    ): number => rows.reduce((acc, r) => acc + revenueOf(r), 0);
 
     const todays = orders.filter(
       (r) => new Date(r.createdAt as string) >= startOfToday,
@@ -103,14 +112,14 @@ export const dashboardApi = {
 
     const summary: DashboardSummary = {
       revenueToday: {
-        amount: sumTotal(todays),
+        amount: sumRevenue(todays),
         currency: 'VND',
       },
       revenueThisMonth: {
-        amount: sumTotal(thisMonth),
+        amount: sumRevenue(thisMonth),
         currency: 'VND',
       },
-      revenueTotal: { amount: sumTotal(orders), currency: 'VND' },
+      revenueTotal: { amount: sumRevenue(orders), currency: 'VND' },
       ordersToday: todays.length,
       ordersThisMonth: thisMonth.length,
       ordersTotal: orders.length,
@@ -138,7 +147,7 @@ export const dashboardApi = {
       });
       series.push({
         date: d.toISOString().slice(0, 10),
-        revenue: sumTotal(inBucket),
+        revenue: sumRevenue(inBucket),
         orders: inBucket.length,
       });
     }
@@ -159,10 +168,14 @@ export const dashboardApi = {
         .slice(0, 10)
         .map((o) => ({
           id: o.id as string,
-          code: o.code as string,
+          code: (o.orderNumber as string) ?? (o.code as string) ?? '',
           status: o.status as string,
-          total: ((o.total as { amount?: number })?.amount ?? 0) as number,
-          customerName: (o.customerName as string) ?? '',
+          total: revenueOf(o),
+          customerName:
+            (o.customerName as string) ??
+            (o.userEmail as string) ??
+            (o.userId as string) ??
+            'Khách hàng',
           createdAt: o.createdAt as string,
         })),
       latestCustomers: customers
