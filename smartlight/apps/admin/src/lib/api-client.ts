@@ -1,6 +1,6 @@
 /**
  * HTTP client for the SmartLight admin dashboard.
- * Mirrors the storefront client \u2014 separate instance so the two apps
+ * Mirrors the storefront client — separate instance so the two apps
  * can set different `baseURL`/tokens without interfering.
  */
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
@@ -122,12 +122,33 @@ export const createApiClient = (): AxiosInstance => {
 export const apiClient = createApiClient();
 
 /**
+ * Unwrap a plain resource object: the API wraps single entities in
+ * `{ data: T }`, so this strips that layer when present.
+ *
+ * Handles both shapes:
+ * - `{ data: T }` → T
+ * - bare `T` → T
+ */
+export function unwrapResource<T>(raw: unknown): T {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Unexpected response: expected object, got ' + typeof raw);
+  }
+  const obj = raw as { data?: T };
+  if ('data' in obj) {
+    if (!obj.data) throw new Error('Unexpected null data in response');
+    return obj.data;
+  }
+  return raw as T;
+}
+
+/**
  * Unwrap the server's paginated envelope into the legacy
  * `Paginated<T>` view (`{ items, total, page, limit }`) so existing pages
  * can keep reading `result.items.length` / `result.total` without changes.
  *
  * Handles both response shapes the API has shipped over time:
- * - `{ data: T[], meta: { pagination: { totalItems, page, limit } } }` — new
+ * - `{ data: { data: [...], meta: { pagination: {...} } } }` — current (double-wrapped)
+ * - `{ data: T[], meta: { pagination: { totalItems, page, limit } } }` — simple
  * - `{ items: T[], total, page, limit }` — legacy
  * - bare `T[]` — last-resort fallback
  */
@@ -147,29 +168,41 @@ export function unwrapPaginated<T>(
   }
   const env = envelope as {
     items?: T[];
-    data?: T[];
+    data?: T[] | { data?: T[]; items?: T[]; total?: number; meta?: { pagination?: { totalItems?: number; page?: number; limit?: number } } };
     total?: number;
     page?: number;
     limit?: number;
     meta?: { pagination?: { totalItems?: number; page?: number; limit?: number } };
   };
 
-  const items: T[] = Array.isArray(env.items)
-    ? env.items
-    : Array.isArray(env.data)
-      ? env.data
-      : [];
+  let items: T[] = [];
+  let total = 0;
+  let page = 1;
+  let limit = 20;
+
+  // Handle double-wrapped response: { data: { data: [...], meta: {...} } }
+  if (env.data && typeof env.data === 'object' && !Array.isArray(env.data)) {
+    const inner = env.data as { data?: T[]; items?: T[]; total?: number; meta?: { pagination?: { totalItems?: number; page?: number; limit?: number } } };
+    items = Array.isArray(inner.data) ? inner.data : (Array.isArray(inner.items) ? inner.items : []);
+    total = inner.total ?? inner.meta?.pagination?.totalItems ?? items.length;
+    page = inner.meta?.pagination?.page ?? 1;
+    limit = inner.meta?.pagination?.limit ?? items.length;
+  } else if (Array.isArray(env.items)) {
+    items = env.items;
+  } else if (Array.isArray(env.data)) {
+    items = env.data;
+  }
+
+  if (env.total !== undefined) total = env.total;
+  if (env.page !== undefined) page = env.page;
+  if (env.limit !== undefined) limit = env.limit;
 
   const meta = env.meta?.pagination;
-  const total =
-    typeof env.total === 'number'
-      ? env.total
-      : typeof meta?.totalItems === 'number'
-        ? meta.totalItems
-        : items.length;
-
-  const page = env.page ?? meta?.page ?? 1;
-  const limit = env.limit ?? meta?.limit ?? items.length;
+  if (meta) {
+    if (meta.totalItems !== undefined) total = meta.totalItems;
+    if (meta.page !== undefined) page = meta.page;
+    if (meta.limit !== undefined) limit = meta.limit;
+  }
 
   return { items, total, page, limit };
 }

@@ -557,6 +557,11 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(500)
   metaDesc?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['DRAFT', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'])
+  status?: string;
 }
 
 export class ListProductsQueryDto {

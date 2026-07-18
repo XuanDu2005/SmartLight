@@ -53,7 +53,7 @@ export interface PaginationParams {
 //  Catalog
 // ===========================================================================
 
-export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'OUT_OF_STOCK';
+export type ProductStatus = 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED';
 
 export interface MoneyAmount {
   amount: number;
@@ -71,23 +71,20 @@ export interface ProductImage {
 
 export interface ProductVariant {
   id: string;
-  productId: string;
   sku: string;
   name?: string | null;
   barcode?: string | null;
-  price: MoneyAmount;
-  compareAtPrice?: MoneyAmount | null;
-  cost?: MoneyAmount | null;
-  color?: string | null;
-  size?: string | null;
-  attributes?: Record<string, string> | null;
+  price: number;
+  compareAtPrice?: number | null;
+  currency: string;
   weightGrams?: number | null;
-  lengthMm?: number | null;
-  widthMm?: number | null;
-  heightMm?: number | null;
-  status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
-  createdAt: string;
-  updatedAt: string;
+  inStock: boolean;
+  stockCount: number;
+  lowStock: boolean;
+  attributes?: Array<{ name: string; value: string }>;
+  imageUrl: string | null;
+  isDefault: boolean;
+  status: string;
 }
 
 export interface CategoryRef {
@@ -104,32 +101,72 @@ export interface BrandRef {
 
 export interface ProductSummary {
   id: string;
-  name: string;
   slug: string;
-  shortDescription?: string | null;
+  name: string;
+  shortDescription: string | null;
+  brand: { id: string; name: string; slug: string } | null;
+  category: { id: string; name: string; slug: string };
+  primaryImage: { url: string; altText: string | null } | null;
+  basePrice: number;
+  compareAtPrice: number | null;
+  currency: string;
+  hasVariants: boolean;
+  priceRange: { min: number; max: number; currency: string } | null;
+  inStock: boolean;
+  averageRating: number;
+  reviewCount: number;
+  createdAt: string;
+  publishedAt: string | null;
+  tags: string[];
   status: ProductStatus;
   isFeatured: boolean;
-  thumbnail?: string | null;
-  priceFrom: MoneyAmount;
-  priceTo: MoneyAmount;
-  category?: CategoryRef | null;
-  brand?: BrandRef | null;
-  variantCount: number;
-  totalStock: number;
-  createdAt: string;
-  updatedAt: string;
+  variantCount?: number;
+  totalStock?: number;
 }
 
-export interface ProductDetail extends ProductSummary {
-  description?: string | null;
-  metaTitle?: string | null;
-  metaDescription?: string | null;
-  metaKeywords?: string[] | null;
-  isNewArrival?: boolean;
-  categoryId: string;
-  brandId?: string | null;
+export interface ProductDetail {
+  // ProductListItemDto fields
+  id: string;
+  slug: string;
+  name: string;
+  shortDescription: string | null;
+  brand: { id: string; name: string; slug: string } | null;
+  category: { id: string; name: string; slug: string };
+  primaryImage: { url: string; altText: string | null } | null;
+  basePrice: number;
+  compareAtPrice: number | null;
+  currency: string;
+  hasVariants: boolean;
+  priceRange: { min: number; max: number; currency: string } | null;
+  inStock: boolean;
+  averageRating: number;
+  reviewCount: number;
+  createdAt: string;
+  publishedAt: string | null;
+  tags: string[];
+  status: ProductStatus;
+  isFeatured: boolean;
+  // ProductDetailDto specific fields
+  description: string | null;
+  images: Array<{
+    id: string;
+    url: string;
+    altText: string | null;
+    displayOrder: number;
+    isPrimary: boolean;
+    variants: { thumbnail?: { url: string; width: number }; medium?: { url: string; width: number }; large?: { url: string; width: number } } | null;
+  }>;
   variants: ProductVariant[];
-  images: ProductImage[];
+  attributes: Array<{
+    attributeId: string;
+    name: string;
+    displayName: string;
+    value: string | number | boolean | null;
+    unit: string | null;
+  }>;
+  metaTitle: string | null;
+  metaDesc: string | null;
+  isNewArrival: boolean;
 }
 
 export interface ListProductsAdminParams extends PaginationParams {
@@ -138,6 +175,7 @@ export interface ListProductsAdminParams extends PaginationParams {
   brandId?: string;
   isFeatured?: boolean;
   includeDeleted?: boolean;
+  includeAllStatuses?: boolean;
 }
 
 export interface CreateProductDto {

@@ -71,7 +71,7 @@ import type {
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-  private readonly gatewayRegistry: Record<PaymentProvider, PaymentGateway>;
+  private readonly gatewayRegistry: Partial<Record<PaymentProvider, PaymentGateway>>;
 
   constructor(
     private readonly repo: PaymentsRepository,
@@ -83,6 +83,7 @@ export class PaymentsService {
       [PaymentProvider.MOMO]: this.momo,
       [PaymentProvider.VNPAY]: this.vnpay,
       [PaymentProvider.PAYPAL]: this.paypal,
+      [PaymentProvider.MANUAL]: undefined,
     };
   }
 
@@ -155,6 +156,9 @@ export class PaymentsService {
 
     // 6. Call provider to obtain checkout URL
     const gateway = this.gatewayRegistry[providerEnum];
+    if (!gateway) {
+      throw new Error(`No gateway registered for provider: ${providerEnum}`);
+    }
     let intent;
     try {
       intent = await gateway.createIntent({
@@ -496,6 +500,10 @@ export class PaymentsService {
     signatureHeader: string | null,
   ): Promise<{ processed: boolean; reason?: string }> {
     const gateway = this.gatewayRegistry[provider];
+    if (!gateway) {
+      this.logger.warn(`No gateway registered for provider: ${provider}, skipping webhook`);
+      return { processed: false, reason: `Unknown provider: ${provider}` };
+    }
 
     // 1. Signature verification (throws on failure)
     let callback: CallbackResult;

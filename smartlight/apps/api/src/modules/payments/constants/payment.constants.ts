@@ -61,6 +61,7 @@ export const PROVIDER_NAMES: Record<PaymentProvider, string> = {
   MOMO: 'momo',
   VNPAY: 'vnpay',
   PAYPAL: 'paypal',
+  MANUAL: 'manual',
 };
 
 /** Allowed provider keys for incoming client requests. */

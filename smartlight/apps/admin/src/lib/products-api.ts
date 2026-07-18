@@ -91,11 +91,11 @@ export const productsApi = {
   listAdmin: async (
     params: ListProductsAdminParams = {},
   ): Promise<Paginated<ProductSummary>> => {
-    const { data } = await apiClient.get<PaginatedEnvelope<ProductSummary>>(
+    const response = await apiClient.get(
       '/admin/catalog/products',
       { params },
     );
-    return unwrapPaginated(data);
+    return unwrapPaginated(response.data);
   },
 
   getAdmin: async (id: string): Promise<ProductDetail> => {

@@ -28,11 +28,15 @@ const variantStatusMap: Record<
 };
 
 const productStatusMap: Record<ProductStatus, 'success' | 'danger' | 'warning' | 'neutral'> = {
-  ACTIVE: 'success',
+  PUBLISHED: 'success',
   DRAFT: 'neutral',
   ARCHIVED: 'warning',
-  OUT_OF_STOCK: 'danger',
+  UNPUBLISHED: 'danger',
 };
+
+function extractVariantAttribute(v: ProductVariant, attrName: string): string | undefined {
+  return v.attributes?.find((a) => a.name === attrName)?.value?.toString();
+}
 
 export const ProductDetailPage = (): JSX.Element => {
   const params = useParams<{ id: string }>();
@@ -186,12 +190,12 @@ export const ProductDetailPage = (): JSX.Element => {
                   {product.brand?.name ?? '—'}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Giá từ:</span>{' '}
-                  {formatVND(product.priceFrom?.amount ?? 0)}
+                  <span className="text-neutral-500">Giá cơ bản:</span>{' '}
+                  {formatVND(product.basePrice)}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Giá đến:</span>{' '}
-                  {formatVND(product.priceTo?.amount ?? 0)}
+                  <span className="text-neutral-500">Giá so sánh:</span>{' '}
+                  {product.compareAtPrice ? formatVND(product.compareAtPrice) : '—'}
                 </div>
                 <div>
                   <span className="text-neutral-500">Ngày tạo:</span>{' '}
@@ -234,10 +238,10 @@ export const ProductDetailPage = (): JSX.Element => {
                   return (
                     <tr key={v.id} className="border-t border-neutral-100">
                       <td className="px-4 py-3 font-medium">{v.sku}</td>
-                      <td className="px-4 py-3">{v.color ?? '—'}</td>
-                      <td className="px-4 py-3">{v.size ?? '—'}</td>
+                      <td className="px-4 py-3">{extractVariantAttribute(v, 'Màu sắc') ?? '—'}</td>
+                      <td className="px-4 py-3">{extractVariantAttribute(v, 'Kích thước') ?? '—'}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {formatVND(v.price.amount)}
+                        {formatVND(v.price)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         {stock
@@ -279,7 +283,7 @@ export const ProductDetailPage = (): JSX.Element => {
                   {img.url ? (
                     <img
                       src={img.url}
-                      alt={img.alt ?? ''}
+                      alt={img.altText ?? ''}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -289,10 +293,9 @@ export const ProductDetailPage = (): JSX.Element => {
                   )}
                 </div>
                 <div className="px-2 py-1 text-xs">
-                  {img.isThumbnail && (
-                    <Badge variant="info">Thumbnail</Badge>
+                  {img.isPrimary && (
+                    <Badge variant="info">Primary</Badge>
                   )}
-                  {img.isVideo && <Badge variant="warning">Video</Badge>}
                 </div>
               </div>
             ))}
@@ -313,11 +316,7 @@ export const ProductDetailPage = (): JSX.Element => {
               </div>
               <div>
                 <span className="text-neutral-500">Meta description:</span>{' '}
-                {product.metaDescription || '—'}
-              </div>
-              <div>
-                <span className="text-neutral-500">Meta keywords:</span>{' '}
-                {product.metaKeywords?.join(', ') || '—'}
+                {product.metaDesc || '—'}
               </div>
             </CardBody>
           </Card>

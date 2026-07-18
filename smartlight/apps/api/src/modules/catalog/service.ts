@@ -1165,6 +1165,12 @@ export class CatalogService {
     if (dto.tags !== undefined) updateData.tags = dto.tags;
     if (dto.metaTitle !== undefined) updateData.metaTitle = dto.metaTitle;
     if (dto.metaDesc !== undefined) updateData.metaDesc = dto.metaDesc;
+    if (dto.status !== undefined) {
+      updateData.status = dto.status as any;
+      if (dto.status === 'PUBLISHED') {
+        updateData.publishedAt = new Date();
+      }
+    }
 
     await this.prisma.product.update({ where: { id }, data: updateData });
     return this.getProductById(id);

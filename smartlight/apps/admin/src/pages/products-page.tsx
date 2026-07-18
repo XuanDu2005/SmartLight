@@ -28,22 +28,22 @@ import type {
 } from '../lib/types';
 
 const statusOptions: Array<{ value: ProductStatus; label: string }> = [
-  { value: 'ACTIVE', label: 'Đang bán' },
+  { value: 'PUBLISHED', label: 'Đã đăng' },
   { value: 'DRAFT', label: 'Nháp' },
+  { value: 'UNPUBLISHED', label: 'Đã ẩn' },
   { value: 'ARCHIVED', label: 'Đã lưu trữ' },
-  { value: 'OUT_OF_STOCK', label: 'Hết hàng' },
 ];
 
 const variantForStatus = (s: ProductStatus) => {
   switch (s) {
-    case 'ACTIVE':
+    case 'PUBLISHED':
       return 'success' as const;
     case 'DRAFT':
       return 'neutral' as const;
+    case 'UNPUBLISHED':
+      return 'warning' as const;
     case 'ARCHIVED':
       return 'warning' as const;
-    case 'OUT_OF_STOCK':
-      return 'danger' as const;
   }
 };
 
@@ -53,6 +53,8 @@ const variantForStatus = (s: ProductStatus) => {
  * - Bulk publish/unpublish + per-row delete with confirmation.
  */
 export const ProductsPage = (): JSX.Element => {
+  console.log('[ProductsPage] Component rendered');
+
   const { push } = useToast();
 
   const [params, setParams] = useState<ListProductsAdminParams>({
@@ -132,7 +134,7 @@ export const ProductsPage = (): JSX.Element => {
   const handleTogglePublish = async (row: ProductSummary): Promise<void> => {
     setBusy(true);
     try {
-      if (row.status === 'ACTIVE') {
+      if (row.status === 'PUBLISHED') {
         await productsApi.unpublish(row.id);
         push({ variant: 'success', title: 'Đã ẩn sản phẩm' });
       } else {
@@ -347,11 +349,11 @@ export const ProductsPage = (): JSX.Element => {
                 </DataTableCell>
                 <DataTableCell>
                   <span className="text-sm tabular-nums">
-                    {formatVND(row.priceFrom?.amount ?? 0)}
+                    {formatVND(row.basePrice)}
                   </span>
                 </DataTableCell>
                 <DataTableCell>
-                  <span className="text-sm">{row.variantCount}</span>
+                  <span className="text-sm">{row.hasVariants ? 'Có' : 'Không'}</span>
                 </DataTableCell>
                 <DataTableCell>
                   <StatusPill
@@ -377,7 +379,7 @@ export const ProductsPage = (): JSX.Element => {
                       onClick={() => void handleTogglePublish(row)}
                       isLoading={busy}
                     >
-                      {row.status === 'ACTIVE' ? 'Ẩn' : 'Đăng'}
+                      {row.status === 'PUBLISHED' ? 'Ẩn' : 'Đăng'}
                     </Button>
                     <Button
                       size="sm"

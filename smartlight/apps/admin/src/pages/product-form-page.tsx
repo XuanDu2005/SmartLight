@@ -169,28 +169,26 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
             slug: prod.slug,
             shortDescription: prod.shortDescription ?? '',
             description: prod.description ?? '',
-            categoryId: prod.categoryId,
-            brandId: prod.brandId ?? '',
-            status: prod.status === 'ACTIVE' || prod.status === 'OUT_OF_STOCK'
-              ? 'PUBLISHED'
-              : (prod.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'),
+            categoryId: prod.category?.id ?? '',
+            brandId: prod.brand?.id ?? '',
+            status: prod.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
             isFeatured: prod.isFeatured,
             isNewArrival: prod.isNewArrival ?? false,
-            basePrice: prod.priceFrom?.amount ?? 0,
+            basePrice: prod.basePrice,
             metaTitle: prod.metaTitle ?? '',
-            metaKeywords: prod.metaKeywords?.join(', ') ?? '',
+            metaKeywords: '',
             variants: prod.variants.map((v) => ({
               id: v.id,
               sku: v.sku,
               name: v.name ?? v.sku,
-              price: v.price.amount,
-              compareAtPrice: v.compareAtPrice?.amount,
-              cost: v.cost?.amount,
+              price: v.price,
+              compareAtPrice: v.compareAtPrice ?? undefined,
+              cost: undefined,
               barcode: v.barcode ?? '',
               weightGrams: v.weightGrams ?? undefined,
-              lengthMm: v.lengthMm ?? undefined,
-              widthMm: v.widthMm ?? undefined,
-              heightMm: v.heightMm ?? undefined,
+              lengthMm: undefined,
+              widthMm: undefined,
+              heightMm: undefined,
             })),
           });
         }
@@ -299,19 +297,16 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
         description: values.description || undefined,
         categoryId: values.categoryId,
         brandId: values.brandId || undefined,
+        status: values.status,
         isFeatured: values.isFeatured,
         isNewArrival: values.isNewArrival,
         metaTitle: values.metaTitle || undefined,
         metaDesc: undefined,
         tags,
-        // The product-level price field is `basePrice` on the DTO. Pick
-        // the first variant's price as a sensible default when the user
-        // didn't enter an explicit base price on the form.
         basePrice: values.basePrice ?? firstVariantPrice ?? 0,
       };
 
       if (mode === 'create') {
-        productPayload.status = values.status;
         productPayload.variants = values.variants.map((v) => ({
           sku: v.sku,
           name: v.name || v.sku,
@@ -397,7 +392,7 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
         }
 
         push({ variant: 'success', title: 'Đã cập nhật sản phẩm' });
-        navigate(`/products/${params.id}`);
+        window.location.href = `/products/${params.id}`;
       }
     } catch (e) {
       // Surface validation details (e.g. "name should not be empty",
@@ -531,6 +526,13 @@ export const ProductFormPage = ({ mode }: ProductFormPageProps): JSX.Element => 
                       <input type="checkbox" {...form.register('isFeatured')} />
                       <span>Hiển thị trong danh sách nổi bật</span>
                     </label>
+                  </FormField>
+                  <FormField label="Giá cơ bản (VND)">
+                    <Input
+                      type="number"
+                      {...form.register('basePrice')}
+                      placeholder="100000"
+                    />
                   </FormField>
                   <FormField
                     label="Mô tả ngắn"
