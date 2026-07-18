@@ -418,13 +418,19 @@ export class InventoryService {
     dto: ImportStockDto,
     adminId?: string,
   ): Promise<InventoryAdjustmentResponseDto> {
+    if (!dto.productVariantId) {
+      throw new Error('productVariantId is required');
+    }
+    if (!dto.quantity || dto.quantity < 1) {
+      throw new Error('quantity must be at least 1');
+    }
     const warehouseCode = dto.warehouseCode ?? INVENTORY_LIMITS.DEFAULT_WAREHOUSE_CODE;
-
-    return this.repo.withTransaction(async (tx) => {
+    return await this.repo.withTransaction(async (tx) => {
       // Find or create inventory record
       let inv = await tx.inventory.findFirst({
         where: { productVariantId: dto.productVariantId, warehouseCode },
       });
+      this.logger.debug(`Existing inventory: ${inv ? inv.id : 'null'}`);
 
       if (!inv) {
         const created = await this.repo.createInventory({
@@ -434,6 +440,7 @@ export class InventoryService {
           reserved: 0,
         }, tx);
         inv = await tx.inventory.findUnique({ where: { id: created.id } });
+        this.logger.debug(`Created inventory: ${inv?.id}`);
       } else {
         // Atomic stock increase
         const result = await this.repo.adjustStock(inv.id, dto.quantity, tx);
@@ -445,7 +452,6 @@ export class InventoryService {
         }
         inv = await tx.inventory.findUnique({ where: { id: inv.id } });
       }
-
       const previousOnHand = (inv?.onHand ?? 0) - dto.quantity;
 
       // Record movement
@@ -638,6 +644,7 @@ export class InventoryService {
     return {
       items: items.map((row: any) => ({
         id: row.id,
+        variantId: row.productVariantId,
         productVariantId: row.productVariantId,
         sku: row.variant?.sku ?? '',
         productName: row.variant?.product?.name ?? '',
