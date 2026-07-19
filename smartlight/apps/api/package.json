@@ -19,6 +19,9 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node -r tsconfig-paths/register --transpile-only --project tsconfig.json prisma/seed.ts",
+    "prisma:db:push": "prisma db push --skip-generate",
+    "db:reset": "prisma db push --skip-generate --force-reset && ts-node -r tsconfig-paths/register --transpile-only --project tsconfig.json prisma/seed.ts",
+    "db:seed": "ts-node -r tsconfig-paths/register --transpile-only --project tsconfig.json prisma/seed.ts",
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {

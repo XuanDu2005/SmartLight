@@ -11,7 +11,7 @@
 | Trường | Giá trị |
 | --- | --- |
 | Email | `admin@smartlight.vn` |
-| Password | `Admin@SmartLight2026` |
+| Password | `Admin@123456` |
 | Display name | `Super Admin` |
 | Role | `super_admin` |
 | Status | `ACTIVE` |

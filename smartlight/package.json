@@ -24,7 +24,10 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "docker:rebuild": "docker compose up -d --build"
+    "docker:rebuild": "docker compose up -d --build",
+    "db:reset": "pnpm --filter @smartlight/api run db:reset",
+    "db:seed": "pnpm --filter @smartlight/api run db:seed",
+    "stack:reset": "powershell -ExecutionPolicy Bypass -File scripts/reset-stack.ps1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
