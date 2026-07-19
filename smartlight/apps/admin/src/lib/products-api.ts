@@ -91,9 +91,19 @@ export const productsApi = {
   listAdmin: async (
     params: ListProductsAdminParams = {},
   ): Promise<Paginated<ProductSummary>> => {
+    // Backend's `AdminListProductsQueryDto` exposes the filter as
+    // `featured` (matches the public `listProducts` query) but the admin
+    // type uses `isFeatured` to mirror the product field name. Translate
+    // here so callers can use the clearer name without 400ing on the
+    // server.
+    const wireParams: Record<string, unknown> = { ...params };
+    if ('isFeatured' in wireParams) {
+      wireParams.featured = wireParams.isFeatured;
+      delete wireParams.isFeatured;
+    }
     const response = await apiClient.get(
       '/admin/catalog/products',
-      { params },
+      { params: wireParams },
     );
     return unwrapPaginated(response.data);
   },

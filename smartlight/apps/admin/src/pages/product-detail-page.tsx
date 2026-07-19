@@ -8,9 +8,13 @@ import {
   CardBody,
   CardHeader,
   EmptyState,
+  FormField,
+  Input,
+  Select,
   Spinner,
   StatusPill,
   Tabs,
+  useToast,
 } from '@smartlight/ui';
 import { inventoryApi } from '../lib/inventory-api';
 import { productsApi } from '../lib/products-api';
@@ -38,13 +42,202 @@ function extractVariantAttribute(v: ProductVariant, attrName: string): string | 
   return v.attributes?.find((a) => a.name === attrName)?.value?.toString();
 }
 
+const STATUS_LABELS: Record<ProductStatus, string> = {
+  PUBLISHED: 'Đã đăng',
+  DRAFT: 'Nháp',
+  UNPUBLISHED: 'Đã ẩn',
+  ARCHIVED: 'Đã lưu trữ',
+};
+
+interface QuickActionsProps {
+  product: ProductDetail;
+  onUpdated: (updated: ProductDetail) => void;
+  onShowToast: (variant: 'success' | 'error', title: string, description?: string) => void;
+}
+
+/**
+ * Quick actions card on the product detail page.
+ *
+ * Lets admins flip the publish state, the featured flag, and the "new
+ * arrival" flag without going through the full edit form. Each control
+ * PATCHes `/admin/catalog/products/:id` with the minimum payload needed —
+ * `status` is sent along with the boolean toggles because
+ * `isFeatured: true` alone won't surface on `/catalog/products/featured`
+ * when `status` is DRAFT, which is the bug that motivated this card.
+ */
+function QuickActionsCard({
+  product,
+  onUpdated,
+  onShowToast,
+}: QuickActionsProps): JSX.Element {
+  const [status, setStatus] = useState<ProductStatus>(product.status);
+  const [isFeatured, setIsFeatured] = useState<boolean>(product.isFeatured);
+  const [isNewArrival, setIsNewArrival] = useState<boolean>(
+    product.isNewArrival ?? false,
+  );
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Keep the local form state in sync if the upstream product changes
+  // (e.g. after a reload triggered by other components). We reset
+  // "dirty" so the save button only reflects user intent.
+  useEffect(() => {
+    setStatus(product.status);
+    setIsFeatured(product.isFeatured);
+    setIsNewArrival(product.isNewArrival ?? false);
+    setDirty(false);
+  }, [product.id, product.status, product.isFeatured, product.isNewArrival]);
+
+  const apply = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const updated = await productsApi.update(product.id, {
+        status,
+        isFeatured,
+        isNewArrival,
+      } as never);
+      // The API returns the resource directly; unwrap defensively in
+      // case `apiClient` ever changes again.
+      const next = (updated as unknown as { data?: ProductDetail }).data ?? updated;
+      onUpdated(next);
+      setDirty(false);
+      onShowToast('success', 'Đã cập nhật trạng thái');
+    } catch (e) {
+      onShowToast(
+        'error',
+        'Không thể lưu',
+        e instanceof Error ? e.message : 'Vui lòng thử lại',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="mb-4 border-smart-200 bg-smart-50/30">
+      <CardHeader>
+        <h2 className="font-semibold text-smart-900">Thao tác nhanh</h2>
+      </CardHeader>
+      <CardBody className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <FormField
+          label="Trạng thái"
+          hint={
+            status === 'PUBLISHED' && !isFeatured
+              ? 'Đang hiển thị trên cửa hàng nhưng chưa ở mục nổi bật'
+              : status !== 'PUBLISHED'
+                ? 'Chỉ sản phẩm Đã đăng mới hiện ở cửa hàng và mục nổi bật'
+                : ''
+          }
+        >
+          <Select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as ProductStatus);
+              setDirty(true);
+            }}
+            disabled={busy}
+          >
+            {(Object.keys(STATUS_LABELS) as ProductStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+
+        <FormField label="Nổi bật">
+          <label className="inline-flex items-center gap-2 pt-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isFeatured}
+              onChange={(e) => {
+                setIsFeatured(e.target.checked);
+                setDirty(true);
+              }}
+              disabled={busy}
+            />
+            <span>Hiển thị trong danh sách nổi bật</span>
+          </label>
+          {isFeatured && status !== 'PUBLISHED' && (
+            <p className="mt-1 text-xs text-amber-700">
+              Cần chuyển sang &quot;Đã đăng&quot; thì sản phẩm mới hiện.
+            </p>
+          )}
+        </FormField>
+
+        <FormField label="Hàng mới">
+          <label className="inline-flex items-center gap-2 pt-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isNewArrival}
+              onChange={(e) => {
+                setIsNewArrival(e.target.checked);
+                setDirty(true);
+              }}
+              disabled={busy}
+            />
+            <span>Hiển thị trong danh sách hàng mới</span>
+          </label>
+        </FormField>
+
+        <div className="flex items-end justify-end gap-2">
+          {dirty && (
+            <span className="text-xs text-amber-700">Có thay đổi chưa lưu</span>
+          )}
+          <Button
+            onClick={() => void apply()}
+            isLoading={busy}
+            disabled={!dirty}
+          >
+            Lưu thay đổi
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 export const ProductDetailPage = (): JSX.Element => {
   const params = useParams<{ id: string }>();
+  const { push } = useToast();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [stockByVariant, setStockByVariant] = useState<Record<string, InventoryStock | null>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState('overview');
+
+  const loadProduct = async (id: string): Promise<ProductDetail | null> => {
+    try {
+      const prod = await productsApi.getAdmin(id);
+      const stockEntries = await Promise.all(
+        prod.variants.map(async (v) => {
+          try {
+            const stock = await inventoryApi.get(v.id);
+            return [v.id, stock] as const;
+          } catch {
+            return [v.id, null] as const;
+          }
+        }),
+      );
+      setStockByVariant(Object.fromEntries(stockEntries));
+      setProduct(prod);
+      return prod;
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setLoadError(
+          e.httpStatus === 404
+            ? 'Sản phẩm không tồn tại hoặc đã bị xoá.'
+            : e.message,
+        );
+      } else if (e instanceof Error) {
+        setLoadError(e.message);
+      } else {
+        setLoadError('Không thể tải sản phẩm');
+      }
+      setProduct(null);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!params.id) return;
@@ -53,43 +246,7 @@ export const ProductDetailPage = (): JSX.Element => {
       setLoading(true);
       setLoadError(null);
       try {
-        const prod = await productsApi.getAdmin(params.id!);
-        if (cancelled) return;
-        setProduct(prod);
-        const stockEntries = await Promise.all(
-          prod.variants.map(async (v) => {
-            try {
-              const stock = await inventoryApi.get(v.id);
-              return [v.id, stock] as const;
-            } catch {
-              // Some legacy variants were created before the backend
-              // started auto-seeding an inventory row, so this 404s.
-              // The UI renders '—' for the missing stock and the admin
-              // can seed it from /inventory if they need a real number.
-              return [v.id, null] as const;
-            }
-          }),
-        );
-        if (!cancelled) {
-          setStockByVariant(Object.fromEntries(stockEntries));
-        }
-      } catch (e) {
-        if (cancelled) return;
-        // The admin console can devolve into "Uncaught (in promise)" if a
-        // rejection is thrown and nothing handles it. Catch + surface a
-        // friendly Vietnamese message instead.
-        if (e instanceof ApiError) {
-          setLoadError(
-            e.httpStatus === 404
-              ? 'Sản phẩm không tồn tại hoặc đã bị xoá.'
-              : e.message,
-          );
-        } else if (e instanceof Error) {
-          setLoadError(e.message);
-        } else {
-          setLoadError('Không thể tải sản phẩm');
-        }
-        setProduct(null);
+        await loadProduct(params.id!);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -135,6 +292,21 @@ export const ProductDetailPage = (): JSX.Element => {
           { label: product.name },
         ]}
         className="mb-3"
+      />
+
+      <QuickActionsCard
+        product={product}
+        onUpdated={(next) => {
+          setProduct(next);
+          setStockByVariant({});
+        }}
+        onShowToast={(variant, title, description) =>
+          push({
+            variant,
+            title,
+            ...(description ? { description } : {}),
+          })
+        }
       />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

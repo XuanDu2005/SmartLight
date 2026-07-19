@@ -25,23 +25,42 @@ import {
   YAxis,
 } from 'recharts';
 import { dashboardApi, type DashboardOverview } from '../lib/dashboard-api';
+import { productsApi } from '../lib/products-api';
 import { formatVND } from '../lib/format';
+import type { ProductSummary } from '../lib/types';
 
 export const DashboardPage = (): JSX.Element => {
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [featured, setFeatured] = useState<ProductSummary[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setFeaturedLoading(true);
       try {
-        const result = await dashboardApi.buildAggregations();
-        if (!cancelled) setData(result);
+        // Kick off both queries in parallel: aggregations for the KPI cards
+        // and the featured-products list (driven by the admin's
+        // `isFeatured=true` flag, not sales ranking).
+        const [agg, featuredRes] = await Promise.all([
+          dashboardApi.buildAggregations(),
+          productsApi
+            .listAdmin({ isFeatured: true, limit: 10, page: 1 } as never)
+            .catch(() => ({ items: [] as ProductSummary[], total: 0 })),
+        ]);
+        if (!cancelled) {
+          setData(agg);
+          setFeatured(featuredRes.items);
+        }
       } catch (e) {
         console.error(e);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setFeaturedLoading(false);
+        }
       }
     })();
     return () => {
@@ -221,6 +240,58 @@ export const DashboardPage = (): JSX.Element => {
         <Card>
           <CardHeader>
             <CardTitle>Sản phẩm nổi bật</CardTitle>
+          </CardHeader>
+          <CardBody>
+            {featuredLoading ? (
+              <Spinner />
+            ) : featured.length === 0 ? (
+              <EmptyState
+                title="Chưa có sản phẩm nổi bật"
+                description="Tick 'Hiển thị trong danh sách nổi bật' ở trang chi tiết sản phẩm để thêm vào đây."
+                action={
+                  <Link to="/products">
+                    <Badge variant="info">Mở danh sách sản phẩm</Badge>
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {featured.slice(0, 10).map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <Link
+                      to={`/products/${p.id}`}
+                      className="truncate hover:text-smart-700"
+                    >
+                      {p.name}
+                    </Link>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <StatusPill
+                        status={p.status}
+                        variant={
+                          p.status === 'PUBLISHED'
+                            ? 'success'
+                            : p.status === 'DRAFT'
+                              ? 'neutral'
+                              : 'warning'
+                        }
+                      />
+                      <span className="text-xs tabular-nums text-neutral-500">
+                        {formatVND(p.basePrice)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sản phẩm bán chạy</CardTitle>
           </CardHeader>
           <CardBody>
             {loading ? (
